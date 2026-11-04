@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Recetario</title>
 <meta name="description" content="Tu plan de equivalentes: recetas, sustituciones, plan semanal, lista de compras y progreso.">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#0F0D0E">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Recetario">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -17,26 +17,32 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Figtree:wght@400;500;600;700&family=Young+Serif&display=swap">
-<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<style>:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#0F0D0E;color:#F7F1F4}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <style>
-/* Mismo sistema visual del Diario de Lectura: blanco, rosa y amarillo (siempre clara).
+/* Mismo sistema del Diario de Lectura (tipografías, botones, ventanas) en negro, amarillo y rosa (siempre oscura).
    Cinco pestañas fijas abajo (Hoy, Recetas, Semana, Compras, Progreso); ventanas flotantes para ver y editar. */
 :root {
-  --bg: #FFFFFF;
-  --surface: #FFFFFF;
-  --field: #FFFBEE;
-  --ink: #3A2A33;
-  --muted: #85707B;
-  --line: #F6DCE6;
-  --accent: #C9487A;
-  --accent-ink: #FFFFFF;
-  --accent-soft: #FCE3EC;
-  --yellow: #F2B705;
-  --yellow-soft: #FFF4CC;
-  --yellow-ink: #6B4E00;
-  --good: #4E9A5E;
-  --warn: #B8693F;
-  --shadow: 0 6px 24px rgba(200, 90, 130, .12);
+  --bg: #0F0D0E;
+  --surface: #1A1719;
+  --field: #241F22;
+  --ink: #F7F1F4;
+  --muted: #A8979F;
+  --line: #3A3035;
+  --accent: #FF4F9A;
+  --accent-ink: #140A0F;
+  --accent-soft: #3A1A29;
+  --accent-strong: #FF8CC0;
+  --yellow: #FFD000;
+  --yellow-soft: #2B240C;
+  --yellow-line: #5A4A12;
+  --yellow-ink: #FFD84D;
+  --good: #6CCB82;
+  --good-soft: #16241A;
+  --good-line: #2C4A33;
+  --warn: #FF9B6B;
+  --warn-soft: #3A2016;
+  --pill-ink: #1A1418;
+  --shadow: 0 6px 24px rgba(0, 0, 0, .5);
   /* un color por grupo de alimentos */
   --g-V: #D3EBC3; --g-F: #F7C6D6; --g-C: #F6ECC3; --g-L: #FBDAC8; --g-PMB: #CBE6F7;
   --g-PM: #F6CFE0; --g-LD: #E1DDF6; --g-GS: #FFE2B5; --g-GP: #E8D8C6;
@@ -92,20 +98,20 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 .meta { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .msg { margin: 0; color: var(--muted); }
 .tag { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
-.tag.ok { background: #E3F1E2; color: var(--good); }
-.tag.bad { background: #FBE7DA; color: var(--warn); }
-.gp { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: var(--ink); white-space: nowrap; }
+.tag.ok { background: var(--good-soft); color: var(--good); }
+.tag.bad { background: var(--warn-soft); color: var(--warn); }
+.gp { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: var(--pill-ink); white-space: nowrap; }
 .bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 .bar > i.full { background: var(--good); }
 .fab { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 5; box-shadow: var(--shadow); }
-.note { background: var(--yellow-soft); border: 1px solid #F8E3A0; border-radius: 14px; padding: 10px 12px; font-size: 12.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.note { background: var(--yellow-soft); border: 1px solid var(--yellow-line); border-radius: 14px; padding: 10px 12px; font-size: 12.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .note button { font-weight: 700; color: var(--accent); min-height: 36px; padding: 0 4px; flex: none; }
 .empty { text-align: center; padding: 34px 12px; color: var(--muted); }
 .empty b { display: block; font-family: var(--display); font-weight: 400; font-size: 18.5px; color: var(--ink); margin-bottom: 4px; }
 .rhead { margin: 18px 0 8px; font-weight: 700; font-size: 11.5px; color: var(--accent); text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 8px; }
 .rhead i { flex: 1; border-top: 1.5px dashed var(--line); }
-.dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
 /* pestañas */
 #tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr);
   padding: 6px max(6px, env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(6px, env(safe-area-inset-right, 0px)); }
@@ -114,8 +120,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 #tabs button[aria-current="page"]::after { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 4px; border-radius: 0 0 4px 4px; background: var(--yellow); }
 #tabs svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 /* ventanas */
-#sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: max(18px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(18px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); background: rgba(58, 42, 51, .4); overscroll-behavior: contain; touch-action: none; }
-#sheet .panel { position: relative; width: 100%; max-width: 560px; max-height: 100%; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; background: var(--surface); border-radius: 22px; padding: 16px 18px 20px; box-shadow: 0 18px 50px rgba(120, 40, 80, .3); }
+#sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: max(18px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(18px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); background: rgba(0, 0, 0, .65); overscroll-behavior: contain; touch-action: none; }
+#sheet .panel { position: relative; width: 100%; max-width: 560px; max-height: 100%; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; background: var(--surface); border-radius: 22px; padding: 16px 18px 20px; box-shadow: 0 18px 50px rgba(0, 0, 0, .6); border: 1px solid var(--line); }
 #sheet .panel > * { max-width: 100%; }
 #sheet .sheettop { position: sticky; top: -16px; z-index: 3; height: 0; display: flex; justify-content: flex-end; margin-right: -8px; }
 #sheet .sheetx { width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 17px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 0 0 4px var(--surface); }
@@ -123,9 +129,9 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: var(--accent); color: var(--accent-ink); padding: 10px 16px; border-radius: 99px; font-size: 12.5px; font-weight: 600; max-width: 90%; text-align: center; }
 .seg { display: flex; background: var(--accent-soft); border-radius: 13px; padding: 3px; margin-bottom: 14px; }
 .seg button { flex: 1; min-height: 38px; border-radius: 10px; font-weight: 700; font-size: 12px; color: var(--accent); padding: 0 2px; }
-.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 4px rgba(190, 80, 120, .18); }
+.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
 .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.kpis .card { background: var(--yellow-soft); border-color: #F8E3A0; }
+.kpis .card { background: var(--yellow-soft); border-color: var(--yellow-line); }
 .kpis .label { color: var(--yellow-ink); }
 .kpi b { display: block; font-family: var(--display); font-weight: 400; font-size: 26.5px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .kpi span { font-size: 11.5px; color: var(--yellow-ink); }
@@ -137,13 +143,13 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 .gtrack .gnum { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
 .gtrack .bar { grid-column: 1 / -1; height: 6px; margin-bottom: 6px; }
 .meal { display: flex; flex-direction: column; gap: 10px; }
-.meal.done { background: #F6FBF4; border-color: #D5EACD; }
+.meal.done { background: var(--good-soft); border-color: var(--good-line); }
 .mhead { display: flex; align-items: baseline; gap: 8px; }
 .mtime { font-family: var(--mono); font-size: 12px; color: var(--accent); }
 .mname { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .rname { font-family: var(--display); font-size: 17.5px; line-height: 1.2; overflow-wrap: anywhere; text-align: left; }
 .check { width: 40px; height: 40px; flex: none; border-radius: 12px; border: 1.5px solid var(--line); display: grid; place-items: center; color: transparent; font-weight: 700; }
-.check.on { background: var(--good); border-color: var(--good); color: #fff; }
+.check.on { background: var(--good); border-color: var(--good); color: var(--bg); }
 /* receta */
 .ing { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .ing:last-child { border-bottom: 0; }
@@ -177,7 +183,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 .shop { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); width: 100%; text-align: left; }
 .shop:last-child { border-bottom: 0; }
 .shop .box { width: 26px; height: 26px; flex: none; border-radius: 8px; border: 1.5px solid var(--line); display: grid; place-items: center; color: transparent; font-weight: 700; font-size: 14px; background: var(--field); }
-.shop.on .box { background: var(--good); border-color: var(--good); color: #fff; }
+.shop.on .box { background: var(--good); border-color: var(--good); color: var(--bg); }
 .shop .sn { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 .shop .sq { text-align: right; font-size: 12.5px; white-space: nowrap; }
 .shop .sq small { display: block; color: var(--muted); font-size: 11px; }
@@ -213,7 +219,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 1;
+  var APP_VERSION = 2;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -252,7 +258,20 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   function seed() {
     var t = dayKey(Date.now());
-    return { v: 1, fresh: true, recipes: clone(window.RX_RECIPES || []), days: [], body: [], plan: { from: t, to: dayKey(addDays(t, 6)) }, shop: { key: "", chk: {} } };
+    return { v: 1, fresh: true, recipes: clone(window.RX_RECIPES || []), seen: baseIds(), days: [], body: [], plan: { from: t, to: dayKey(addDays(t, 6)) }, shop: { key: "", chk: {} } };
+  }
+  function baseIds() { return (window.RX_RECIPES || []).map(function (r) { return r.id; }); }
+  /* Recetas que se agreguen después a datos.js: llegan solas a los teléfonos que ya usan la app.
+     "seen" recuerda cuáles recetas base ya se ofrecieron, para no revivir las que borraste. */
+  function mergeBase() {
+    var seen = S.seen || [], have = S.recipes.map(function (r) { return r.id; }), n = 0;
+    (window.RX_RECIPES || []).forEach(function (r) {
+      if (seen.indexOf(r.id) > -1) return;
+      seen.push(r.id);
+      if (have.indexOf(r.id) < 0) { S.recipes.push(clone(r)); n++; }
+    });
+    S.seen = seen;
+    return n;
   }
   function normalize(d) {
     d = d || {};
@@ -260,6 +279,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     return {
       v: 1, fresh: !!d.fresh,
       recipes: Array.isArray(d.recipes) ? d.recipes : clone(window.RX_RECIPES || []),
+      seen: Array.isArray(d.seen) ? d.seen : baseIds().filter(function (id) { return /^(des|c1|com|c2|cen)[1-5]$/.test(id); }),
       days: Array.isArray(d.days) ? d.days : [],
       body: Array.isArray(d.body) ? d.body : [],
       plan: d.plan && d.plan.from ? d.plan : { from: t, to: dayKey(addDays(t, 6)) },
@@ -528,7 +548,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   }
   function editValid() {
     var c = checkRecipe({ m: ui.edit.m, it: ui.edit.it });
-    return '<div class="card" style="background:' + (c.ok ? "#F6FBF4" : "var(--yellow-soft)") + ';border-color:' + (c.ok ? "#D5EACD" : "#F8E3A0") + '"><div class="label" style="margin-bottom:6px">' + (c.ok ? "✓ Cuadra con tus equivalentes de " + MBY[ui.edit.m].n.toLowerCase() : "Aún no cuadra con " + MBY[ui.edit.m].n.toLowerCase()) + '</div><div class="vgrid">' +
+    return '<div class="card" style="background:' + (c.ok ? "var(--good-soft)" : "var(--yellow-soft)") + ';border-color:' + (c.ok ? "var(--good-line)" : "var(--yellow-line)") + '"><div class="label" style="margin-bottom:6px">' + (c.ok ? "✓ Cuadra con tus equivalentes de " + MBY[ui.edit.m].n.toLowerCase() : "Aún no cuadra con " + MBY[ui.edit.m].n.toLowerCase()) + '</div><div class="vgrid">' +
       c.rows.map(function (x) { return '<span class="gp" style="background:var(--g-' + x.k + ')' + (x.ok ? "" : ";box-shadow:inset 0 0 0 1.5px var(--warn)") + '">' + esc(GBY[x.k].n) + " " + fracTxt(x.have) + "/" + x.need + "</span>"; }).join("") + "</div></div>";
   }
   function foodPickSheet() {
@@ -690,10 +710,10 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var tip = ui.tip != null && weeks[ui.tip] ? weeks[ui.tip] : null;
     h += '<p class="ctip">' + (tip ? "Semana del " + esc(dayLabel(tip.a)) + ": " + (tip.v == null ? "sin registro" : tip.v + "% de comidas hechas") : '<span class="meta">Toca una barra para ver el detalle.</span>') + "</p>";
     h += '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Porcentaje de comidas hechas por semana, últimas 8 semanas">';
-    [0, 50, 100].forEach(function (v) { var y = top + ch - ch * v / 100; h += '<line x1="0" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#F6DCE6" stroke-width="1"' + (v ? ' stroke-dasharray="3 3"' : "") + '/><text x="' + W + '" y="' + (y - 3) + '" text-anchor="end">' + v + "%</text>"; });
+    [0, 50, 100].forEach(function (v) { var y = top + ch - ch * v / 100; h += '<line x1="0" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#3A3035" stroke-width="1"' + (v ? ' stroke-dasharray="3 3"' : "") + '/><text x="' + W + '" y="' + (y - 3) + '" text-anchor="end">' + v + "%</text>"; });
     weeks.forEach(function (w, i) {
       var x = gap / 2 + i * (bw + gap), v = w.v || 0, bh = Math.max(w.v ? 3 : 0, ch * v / 100), y = top + ch - bh, sel = ui.tip === i;
-      if (w.v != null && bh > 0) h += '<path d="M' + x + " " + (top + ch) + "V" + (y + 4) + "q0 -4 4 -4h" + (bw - 8) + "q4 0 4 4V" + (top + ch) + 'z" fill="' + (sel ? "#A8325F" : "#C9487A") + '"/>';
+      if (w.v != null && bh > 0) h += '<path d="M' + x + " " + (top + ch) + "V" + (y + 4) + "q0 -4 4 -4h" + (bw - 8) + "q4 0 4 4V" + (top + ch) + 'z" fill="' + (sel ? "#FFD000" : "#FF4F9A") + '"/>';
       if (i === weeks.length - 1 && w.v != null) h += '<text class="val" x="' + (x + bw / 2) + '" y="' + (y - 4) + '" text-anchor="middle">' + w.v + "%</text>";
       h += '<text x="' + (x + bw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + new Date(parseDay(w.a)).getDate() + " " + MO[new Date(parseDay(w.a)).getMonth()] + "</text>";
       h += '<rect class="hit" data-act="tip" data-i="' + i + '" x="' + (x - gap / 2) + '" y="0" width="' + (bw + gap) + '" height="' + H + '"><title>Semana del ' + esc(dayLabel(w.a)) + ": " + (w.v == null ? "sin registro" : w.v + "%") + "</title></rect>";
@@ -709,11 +729,11 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     function Y(v) { return top + (H - top - bot) * (1 - (v - mn) / (mx - mn)); }
     var tip = ui.wtip != null && pts[ui.wtip] ? pts[ui.wtip] : null, h = '<p class="ctip">' + (tip ? esc(dayLabel(tip.date, true)) + ": " + fmtNum(tip.w) + " kg" : '<span class="meta">Toca un punto para ver el detalle.</span>') + "</p>";
     h += '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Peso a lo largo del tiempo">';
-    [mn + pad, mx - pad].forEach(function (v) { var y = Y(v); h += '<line x1="0" x2="' + (W - r + 6) + '" y1="' + y + '" y2="' + y + '" stroke="#F6DCE6" stroke-dasharray="3 3"/><text x="' + W + '" y="' + (y + 3) + '" text-anchor="end">' + fmtNum(v) + "</text>"; });
-    h += '<polyline fill="none" stroke="#C9487A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="' + pts.map(function (p) { return X(p) + "," + Y(p.w); }).join(" ") + '"/>';
+    [mn + pad, mx - pad].forEach(function (v) { var y = Y(v); h += '<line x1="0" x2="' + (W - r + 6) + '" y1="' + y + '" y2="' + y + '" stroke="#3A3035" stroke-dasharray="3 3"/><text x="' + W + '" y="' + (y + 3) + '" text-anchor="end">' + fmtNum(v) + "</text>"; });
+    h += '<polyline fill="none" stroke="#FF4F9A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="' + pts.map(function (p) { return X(p) + "," + Y(p.w); }).join(" ") + '"/>';
     pts.forEach(function (p, i) {
       var sel = ui.wtip === i, last = i === pts.length - 1;
-      if (sel || last || pts.length <= 12) h += '<circle cx="' + X(p) + '" cy="' + Y(p.w) + '" r="' + (sel ? 5.5 : 4) + '" fill="#C9487A" stroke="#fff" stroke-width="2"/>';
+      if (sel || last || pts.length <= 12) h += '<circle cx="' + X(p) + '" cy="' + Y(p.w) + '" r="' + (sel ? 5.5 : 4) + '" fill="' + (sel ? "#FFD000" : "#FF4F9A") + '" stroke="#0F0D0E" stroke-width="2"/>';
       h += '<circle class="hit" data-act="wtip" data-i="' + i + '" cx="' + X(p) + '" cy="' + Y(p.w) + '" r="14"><title>' + esc(dayLabel(p.date)) + ": " + fmtNum(p.w) + " kg</title></circle>";
     });
     var lp = pts[pts.length - 1];
@@ -769,7 +789,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var r = e.isNew ? null : recipeById(e.id);
     if (!r) { r = { id: "r" + uid() }; S.recipes.push(r); }
     var oldItems = JSON.stringify(r.it || []);
-    r.m = e.m; r.n = name; r.o = e.isNew ? 0 : (r.o || 0); r.it = items; r.st = steps;
+    if (e.isNew || r.m !== e.m) r.o = recipesOf(e.m).reduce(function (mx, x) { return x.id !== r.id && x.o > mx ? x.o : mx; }, 0) + 1;
+    r.m = e.m; r.n = name; r.it = items; r.st = steps;
     if (oldItems !== JSON.stringify(items)) S.days.forEach(function (d) { Object.keys(d.m).forEach(function (m) { if (d.m[m].r === r.id) d.m[m].s = {}; }); });
     persist();
     var keepRv = ui.rv && ui.rv.id === r.id ? ui.rv : null;
@@ -906,10 +927,10 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       case "backup": exportBackup(); break;
       case "restore-pick": $("#rsf").click(); break;
       case "restore-do": applyRestore(); break;
-      case "reset-recipes": openSheet('<h2>Restaurar recetario</h2><div class="stack"><p class="msg" style="font-size:12.5px">Vuelve a poner las 25 recetas originales tal como venían. Tus recetas propias se conservan; los cambios que hiciste a las originales se pierden.</p><button class="btn primary block" data-act="reset-do">Restaurar</button><button class="btn ghost block" data-act="close">Cancelar</button></div>'); break;
+      case "reset-recipes": openSheet('<h2>Restaurar recetario</h2><div class="stack"><p class="msg" style="font-size:12.5px">Vuelve a poner las recetas originales tal como venían. Tus recetas propias se conservan; los cambios que hiciste a las originales se pierden.</p><button class="btn primary block" data-act="reset-do">Restaurar</button><button class="btn ghost block" data-act="close">Cancelar</button></div>'); break;
       case "reset-do": {
         var base = clone(window.RX_RECIPES || []), ids = base.map(function (r) { return r.id; });
-        S.recipes = base.concat(S.recipes.filter(function (r) { return ids.indexOf(r.id) < 0 && !/^(des|c1|com|c2|cen)\d$/.test(r.id); }));
+        S.recipes = base.concat(S.recipes.filter(function (r) { return ids.indexOf(r.id) < 0 && !/^(des|c1|com|c2|cen)\d+$/.test(r.id); }));
         persist(); closeSheet(); render(); toast("Recetario original restaurado"); break;
       }
       case "sync-in": signIn(); break;
@@ -1034,12 +1055,14 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function curMaps() {
     var m = {};
     Object.keys(ARR).forEach(function (c) { m[c] = {}; (S[ARR[c]] || []).forEach(function (x) { if (x && x.id) m[c][String(x.id)] = JSON.stringify(x); }); });
-    m.rx_meta = { plan: JSON.stringify(S.plan), shop: JSON.stringify(S.shop) };
+    m.rx_meta = { plan: JSON.stringify(S.plan), shop: JSON.stringify(S.shop), seen: JSON.stringify(S.seen || []) };
     return m;
   }
   function applyItem(c, id, v) {
     var x = v === null ? null : JSON.parse(v);
-    if (c === "rx_meta") { if (x && (id === "plan" || id === "shop")) S[id] = x; return; }
+    if (c === "rx_meta") { if (x && (id === "plan" || id === "shop")) S[id] = x;
+      if (x && id === "seen" && Array.isArray(x)) x.forEach(function (k) { if ((S.seen || (S.seen = [])).indexOf(k) < 0) S.seen.push(k); });
+      return; }
     var arr = S[ARR[c]] = S[ARR[c]] || [], i = arr.map(function (y) { return String(y.id); }).indexOf(id);
     if (x === null) { if (i > -1) arr.splice(i, 1); }
     else if (i > -1) arr[i] = x; else arr.push(x);
@@ -1151,6 +1174,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   }
 
   /* ---------- arranque ---------- */
+  var added = mergeBase();
+  if (added) { persist(); setTimeout(function () { toast(added === 1 ? "Se agregó 1 receta nueva al recetario" : "Se agregaron " + added + " recetas nuevas al recetario"); }, 600); }
   render();
   // Si ya iniciaste sesión antes (aquí o en el Diario, mismo proyecto), la sincronización arranca sola.
   try { if (loadSnap() && navigator.onLine !== false) loadFirebase().catch(function () {}); } catch (e) {}
