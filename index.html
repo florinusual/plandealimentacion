@@ -219,7 +219,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 3;
+  var APP_VERSION = 4;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -376,7 +376,15 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function cleanDay(k) {
     var d = dayById(k); if (!d) return;
     Object.keys(d.m).forEach(function (m) { var s = d.m[m]; if (!s.r && !s.d) delete d.m[m]; });
-    if (!Object.keys(d.m).length) S.days = S.days.filter(function (x) { return x.id !== k; });
+    if (!Object.keys(d.m).length && !d.skip) S.days = S.days.filter(function (x) { return x.id !== k; });
+  }
+  /* Días omitidos (comiste fuera, oficina, salida…): no cuentan para compras ni para el apego. */
+  var SKIPS = ["Comí fuera", "Oficina", "Salida con amigos", "Otro motivo"];
+  function skipOf(k) { var d = dayById(k); return d && d.skip ? d.skip : ""; }
+  function skipSheet(k) {
+    ui.skipDay = k;
+    openSheet("<h2>Omitir día</h2><p class='sub'>" + esc(dayTitle(k)) + ". Este día no contará en tu lista de compras ni en tu apego al plan. ¿Por qué lo omites?</p><div class='olist'>" +
+      SKIPS.map(function (x) { return '<button class="opt" data-act="skip-set" data-r="' + esc(x) + '"><span class="dot" style="background:var(--yellow)"></span><span class="on">' + esc(x) + "</span><span></span></button>"; }).join("") + "</div>");
   }
   function subFood(it, subs, i) { var f = subs && subs[i] && FBY[subs[i]]; return f || FBY[it.f]; }
 
@@ -399,6 +407,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     h += '<h1>' + (k === today ? "Hoy" : k < today ? "Registro" : "Próximamente") + "</h1>";
     h += '<div class="daynav"><button class="btn sm icon" data-act="day" data-d="-1" aria-label="Día anterior">‹</button><div class="dl">' + esc(dayLabel(k, true)) + '</div><button class="btn sm icon" data-act="day" data-d="1" aria-label="Día siguiente">›</button></div>';
     if (k !== today) h += '<div class="note"><span>Estás viendo otro día.</span><button data-act="day-today">Volver a hoy</button></div>';
+    if (d && d.skip) return h + '<div class="empty card"><b>Día omitido</b>' + esc(d.skip) + '. Este día no cuenta para tus compras ni para tu apego.<div style="margin-top:14px"><button class="btn" data-act="skip-undo" data-date="' + k + '">Deshacer omisión</button></div></div>';
     var done = {}, nDone = 0;
     MEALS.forEach(function (m) {
       var s = d && d.m[m.k], r = s && s.r && recipeById(s.r);
@@ -580,9 +589,10 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     days.forEach(function (k) {
       var d = dayById(k);
       // Días que ya pasaron sin nada planeado ni registrado: solo el título y "Sin registros".
-      if (k < today && !d) { h += '<div class="card pday" style="margin-bottom:10px;opacity:.75"><div class="row spread"><h3>' + esc(dayTitle(k)) + '</h3><span class="tag">Sin registros</span></div></div>'; return; }
+      if (d && d.skip) { h += '<div class="card pday" style="margin-bottom:10px;opacity:.8"><div class="row spread"><div class="stack" style="gap:4px"><h3 style="margin:0">' + esc(dayTitle(k)) + '</h3><span><span class="tag" style="background:var(--yellow-soft);color:var(--yellow-ink)">Día omitido · ' + esc(d.skip) + '</span></span></div><button class="btn sm ghost" data-act="skip-undo" data-date="' + k + '">Deshacer</button></div></div>'; return; }
+      if (k < today && !d) { h += '<div class="card pday" style="margin-bottom:10px;opacity:.75"><div class="row spread"><div class="stack" style="gap:4px"><h3 style="margin:0">' + esc(dayTitle(k)) + '</h3><span><span class="tag">Sin registros</span></span></div><button class="btn sm ghost" data-act="skip-day" data-date="' + k + '">Omitir día</button></div></div>'; return; }
       open++;
-      h += '<div class="card pday" style="margin-bottom:10px"><div class="row spread"><h3>' + esc(dayTitle(k)) + '</h3><button class="btn sm ghost" data-act="go-day" data-date="' + k + '">Ver día</button></div>';
+      h += '<div class="card pday" style="margin-bottom:10px"><div class="row spread"><h3>' + esc(dayTitle(k)) + '</h3><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="skip-day" data-date="' + k + '">Omitir día</button><button class="btn sm ghost" data-act="go-day" data-date="' + k + '">Ver día</button></span></div>';
       MEALS.forEach(function (m) {
         var s = d && d.m[m.k]; if (s && s.r) planned++;
         h += '<div class="prow"><div class="pl">' + m.n + "<span>" + m.h + '</span></div><select data-in="plan" data-date="' + k + '" data-m="' + m.k + '" aria-label="' + m.n + " del " + esc(dayLabel(k)) + '"><option value="">— Sin elegir —</option>' + recipesOf(m.k).map(function (r) { return '<option value="' + esc(r.id) + '"' + (s && s.r === r.id ? " selected" : "") + ">" + esc((r.o ? r.o + ". " : "") + r.n) + "</option>"; }).join("") + "</select></div>";
@@ -602,7 +612,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       var d = dayById(k), any = false; if (!d) return;
       MEALS.forEach(function (m) {
         var s = d.m[m.k], r = s && s.r && recipeById(s.r); if (!r) return;
-        if (k < today || s.d) { nSkip++; return; }
+        if (k < today || s.d || d.skip) { nSkip++; return; }
         nMeals++; any = true;
         r.it.forEach(function (it, i) {
           if (!it.f) { freeParts(it.t).forEach(function (t) { var key = norm(t); (free[key] = free[key] || { t: t, n: 0 }).n++; }); return; }
@@ -622,8 +632,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var sd = shopData(), h = '<h1>Lista de compras</h1>';
     if (S.shop.key !== sd.key) { S.shop = { key: sd.key, chk: {} }; }
     h += '<p class="sub">Del <b>' + esc(dayLabel(S.plan.from, true)) + "</b> al <b>" + esc(dayLabel(S.plan.to, true)) + "</b> · " + sd.nMeals + (sd.nMeals === 1 ? " comida" : " comidas") + " en " + sd.nDays + (sd.nDays === 1 ? " día" : " días") + '. <button style="color:var(--accent);font-weight:700;padding:0" data-tab-go="semana">Cambiar plan</button></p>';
-    if (sd.nSkip) h += '<div class="note"><span>No se incluyen ' + sd.nSkip + (sd.nSkip === 1 ? " comida que ya pasó o ya marcaste como hecha" : " comidas que ya pasaron o ya marcaste como hechas") + ': solo lo que te falta por comer.</span></div>';
-    if (!sd.nMeals) return h + (sd.nSkip ? '<div class="empty"><b>Nada pendiente por comprar</b>Todas las comidas planeadas de este rango ya pasaron o ya están hechas.</div>' : '<div class="empty"><b>Aún no hay plan</b>Elige tus recetas en la pestaña Semana y aquí aparecerá lo que necesitas comprar.</div>');
+    if (sd.nSkip) h += '<div class="note"><span>No se incluyen ' + sd.nSkip + (sd.nSkip === 1 ? " comida que ya pasó, ya está hecha o es de un día omitido" : " comidas que ya pasaron, ya están hechas o son de días omitidos") + ': solo lo que te falta por comer.</span></div>';
+    if (!sd.nMeals) return h + (sd.nSkip ? '<div class="empty"><b>Nada pendiente por comprar</b>Todas las comidas planeadas de este rango ya pasaron, ya están hechas o son de días omitidos.</div>' : '<div class="empty"><b>Aún no hay plan</b>Elige tus recetas en la pestaña Semana y aquí aparecerá lo que necesitas comprar.</div>');
     var ids = Object.keys(sd.byFood), nChk = ids.filter(function (id) { return S.shop.chk[id]; }).length;
     h += '<div class="row" style="margin-bottom:6px"><button class="btn sm" data-act="shop-share">Compartir lista</button>' + (nChk ? '<button class="btn sm ghost" data-act="shop-reset">Desmarcar todo</button>' : "") + '<span class="meta" style="margin-left:auto">' + nChk + " de " + ids.length + "</span></div>";
     GROUPS.forEach(function (g) {
@@ -663,16 +673,18 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   /* Progreso: apego al plan, racha, peso y medidas */
   function doneCount(k) { var d = dayById(k); if (!d) return 0; return MEALS.filter(function (m) { return d.m[m.k] && d.m[m.k].d; }).length; }
   function streak() {
-    var t = dayKey(Date.now()), n = 0, k = doneCount(t) === 5 ? t : dayKey(addDays(t, -1));
-    while (doneCount(k) === 5 && n < 3650) { n++; k = dayKey(addDays(k, -1)); }
+    // Los días omitidos no suman ni rompen la racha.
+    var t = dayKey(Date.now()), n = 0, k = doneCount(t) === 5 || skipOf(t) ? t : dayKey(addDays(t, -1)), guard = 0;
+    while ((doneCount(k) === 5 || skipOf(k)) && guard++ < 3650) { if (!skipOf(k)) n++; k = dayKey(addDays(k, -1)); }
     return n;
   }
   function weekStart(k) { var d = new Date(parseDay(k)), wd = (d.getDay() + 6) % 7; return dayKey(addDays(k, -wd)); }
   function adherence(from, to) {
-    var days = rangeDays(from, to), done = 0;
+    var days = rangeDays(from, to).filter(function (k) { return !skipOf(k); }), done = 0;
     days.forEach(function (k) { done += doneCount(k); });
-    return days.length ? Math.round(done / (days.length * 5) * 100) : 0;
+    return days.length ? Math.round(done / (days.length * 5) * 100) : null;
   }
+  function pctTxt(v) { return v == null ? "—" : v + "%"; }
   function firstLog() { var ks = S.days.filter(function (d) { return Object.keys(d.m).some(function (m) { return d.m[m].d; }); }).map(function (d) { return d.id; }).sort(); return ks[0] || ""; }
   function viewProgreso() {
     var t = dayKey(Date.now()), ws = weekStart(t), first = firstLog(), h = '<h1>Progreso</h1><p class="sub">Tu apego al plan se calcula con las comidas que marcas como hechas en Hoy.</p>';
@@ -680,8 +692,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var wFrom = first && first > ws ? first : ws;
     var body = S.body.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }), lastW = body.filter(function (b) { return b.w; }), wNow = lastW.length ? lastW[lastW.length - 1] : null, w0 = lastW[0];
     h += '<div class="kpis"><div class="card kpi"><span class="label">Racha</span><b>' + streak() + "</b><span>días completos seguidos</span></div>";
-    h += '<div class="card kpi"><span class="label">Esta semana</span><b>' + (first ? adherence(wFrom, t) : 0) + "%</b><span>de comidas hechas</span></div>";
-    h += '<div class="card kpi"><span class="label">Últimos 30 días</span><b>' + (first ? adherence(from30, t) : 0) + "%</b><span>de apego</span></div>";
+    h += '<div class="card kpi"><span class="label">Esta semana</span><b>' + pctTxt(first ? adherence(wFrom, t) : 0) + "</b><span>de comidas hechas</span></div>";
+    h += '<div class="card kpi"><span class="label">Últimos 30 días</span><b>' + pctTxt(first ? adherence(from30, t) : 0) + "</b><span>de apego</span></div>";
     h += '<div class="card kpi"><span class="label">Peso actual</span><b>' + (wNow ? fmtNum(wNow.w) + " kg" : "—") + "</b><span>" + (wNow && w0 && w0 !== wNow ? (wNow.w - w0.w > 0 ? "+" : "") + fmtNum(wNow.w - w0.w) + " kg desde el inicio" : "registra tu peso abajo") + "</span></div></div>";
     // apego por semana (8 semanas)
     h += '<h2 style="margin-top:28px">Apego por semana</h2><div class="card">';
@@ -897,6 +909,9 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       case "e-delete-no": ui.confirm = false; editSheet(); break;
       case "e-delete-do": deleteRecipe(); break;
       case "quick": quickRange(d.q); break;
+      case "skip-day": skipSheet(d.date); break;
+      case "skip-set": { var dd0 = dayEntry(ui.skipDay, true); dd0.skip = d.r; persist(); closeSheet(); render(); toast("Día omitido"); break; }
+      case "skip-undo": { var dd1 = dayById(d.date); if (dd1) { delete dd1.skip; cleanDay(d.date); persist(); } render(); toast("Omisión deshecha"); break; }
       case "clear-plan": {
         rangeDays(S.plan.from, S.plan.to).forEach(function (k) { var dd = dayById(k); if (!dd) return; Object.keys(dd.m).forEach(function (m) { if (!dd.m[m].d) { dd.m[m].r = ""; dd.m[m].s = {}; } }); cleanDay(k); });
         persist(); render(); toast("Plan vaciado (se conservan las comidas ya hechas)"); break;
