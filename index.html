@@ -595,12 +595,14 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   }
 
   /* Compras: suma lo que piden las recetas planeadas en el rango, con los cambios de ingrediente de cada día. */
+  /* Solo cuenta lo que falta por comer: no entran los días que ya pasaron ni las comidas marcadas como hechas. */
   function shopData() {
-    var days = rangeDays(S.plan.from, S.plan.to), byFood = {}, free = {}, nMeals = 0, nDays = 0;
+    var days = rangeDays(S.plan.from, S.plan.to), today = dayKey(Date.now()), byFood = {}, free = {}, nMeals = 0, nDays = 0, nSkip = 0;
     days.forEach(function (k) {
       var d = dayById(k), any = false; if (!d) return;
       MEALS.forEach(function (m) {
         var s = d.m[m.k], r = s && s.r && recipeById(s.r); if (!r) return;
+        if (k < today || s.d) { nSkip++; return; }
         nMeals++; any = true;
         r.it.forEach(function (it, i) {
           if (!it.f) { freeParts(it.t).forEach(function (t) { var key = norm(t); (free[key] = free[key] || { t: t, n: 0 }).n++; }); return; }
@@ -610,7 +612,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       });
       if (any) nDays++;
     });
-    return { byFood: byFood, free: free, nMeals: nMeals, nDays: nDays, key: S.plan.from + "|" + S.plan.to };
+    return { byFood: byFood, free: free, nMeals: nMeals, nDays: nDays, nSkip: nSkip, key: S.plan.from + "|" + S.plan.to };
   }
   /* "Sal, pimienta y limón" → Sal · Pimienta · Limón, para juntar los condimentos repetidos. */
   function freeParts(t) {
@@ -620,7 +622,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var sd = shopData(), h = '<h1>Lista de compras</h1>';
     if (S.shop.key !== sd.key) { S.shop = { key: sd.key, chk: {} }; }
     h += '<p class="sub">Del <b>' + esc(dayLabel(S.plan.from, true)) + "</b> al <b>" + esc(dayLabel(S.plan.to, true)) + "</b> · " + sd.nMeals + (sd.nMeals === 1 ? " comida" : " comidas") + " en " + sd.nDays + (sd.nDays === 1 ? " día" : " días") + '. <button style="color:var(--accent);font-weight:700;padding:0" data-tab-go="semana">Cambiar plan</button></p>';
-    if (!sd.nMeals) return h + '<div class="empty"><b>Aún no hay plan</b>Elige tus recetas en la pestaña Semana y aquí aparecerá lo que necesitas comprar.</div>';
+    if (sd.nSkip) h += '<div class="note"><span>No se incluyen ' + sd.nSkip + (sd.nSkip === 1 ? " comida que ya pasó o ya marcaste como hecha" : " comidas que ya pasaron o ya marcaste como hechas") + ': solo lo que te falta por comer.</span></div>';
+    if (!sd.nMeals) return h + (sd.nSkip ? '<div class="empty"><b>Nada pendiente por comprar</b>Todas las comidas planeadas de este rango ya pasaron o ya están hechas.</div>' : '<div class="empty"><b>Aún no hay plan</b>Elige tus recetas en la pestaña Semana y aquí aparecerá lo que necesitas comprar.</div>');
     var ids = Object.keys(sd.byFood), nChk = ids.filter(function (id) { return S.shop.chk[id]; }).length;
     h += '<div class="row" style="margin-bottom:6px"><button class="btn sm" data-act="shop-share">Compartir lista</button>' + (nChk ? '<button class="btn sm ghost" data-act="shop-reset">Desmarcar todo</button>' : "") + '<span class="meta" style="margin-left:auto">' + nChk + " de " + ids.length + "</span></div>";
     GROUPS.forEach(function (g) {
