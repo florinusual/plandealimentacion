@@ -174,7 +174,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 .eitem.free { grid-template-columns: minmax(0, 1fr) 110px 40px; }
 /* semana */
 .pday { padding: 12px 14px; }
-.pday h3 { text-transform: capitalize; margin-bottom: 8px; }
+.pday h3 { margin-bottom: 8px; }
 .prow { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; align-items: center; margin-top: 6px; }
 .prow .pl { font-size: 11px; font-weight: 700; color: var(--muted); line-height: 1.2; }
 .prow .pl span { display: block; font-family: var(--mono); font-weight: 500; color: var(--accent); }
@@ -219,7 +219,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 2;
+  var APP_VERSION = 3;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -301,6 +301,9 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   var WD = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
   var MO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   function dayLabel(k, long) { var d = new Date(parseDay(k)); return (long ? WD[d.getDay()] + " " : WD[d.getDay()].slice(0, 3) + " ") + d.getDate() + " " + MO[d.getMonth()]; }
+  var MOL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  function cap(x) { return x.charAt(0).toUpperCase() + x.slice(1); }
+  function dayTitle(k) { var d = new Date(parseDay(k)); return cap(WD[d.getDay()]) + " " + pad(d.getDate()) + " de " + cap(MOL[d.getMonth()]); }
   function rangeDays(a, b) {
     var out = [], t = parseDay(a), e = parseDay(b);
     if (!(t <= e)) return out;
@@ -572,18 +575,21 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     h += '<div class="card stack" style="margin-bottom:14px"><div class="grid2"><label class="field"><span class="label">Desde</span><input type="date" data-in="plan-from" value="' + esc(p.from) + '"></label><label class="field"><span class="label">Hasta</span><input type="date" data-in="plan-to" value="' + esc(p.to) + '"></label></div>';
     h += '<div class="chips" style="margin:0"><button class="chip" data-act="quick" data-q="week">Esta semana</button><button class="chip" data-act="quick" data-q="7">Próximos 7 días</button><button class="chip" data-act="quick" data-q="next">Semana siguiente</button></div>';
     if (!days.length) return h + '<p class="meta" style="color:var(--warn)">La fecha final debe ser igual o posterior a la inicial.</p></div>';
-    h += '<div class="row"><button class="btn sm" data-act="fill">Rellenar vacíos</button><button class="btn sm ghost" data-act="clear-plan">Vaciar rango</button></div></div>';
-    var planned = 0;
+    h += '<div class="row"><button class="btn sm ghost" data-act="clear-plan">Vaciar rango</button></div></div>';
+    var planned = 0, open = 0, today = dayKey(Date.now());
     days.forEach(function (k) {
       var d = dayById(k);
-      h += '<div class="card pday" style="margin-bottom:10px"><div class="row spread"><h3>' + esc(dayLabel(k, true)) + '</h3><button class="btn sm ghost" data-act="go-day" data-date="' + k + '">Ver día</button></div>';
+      // Días que ya pasaron sin nada planeado ni registrado: solo el título y "Sin registros".
+      if (k < today && !d) { h += '<div class="card pday" style="margin-bottom:10px;opacity:.75"><div class="row spread"><h3>' + esc(dayTitle(k)) + '</h3><span class="tag">Sin registros</span></div></div>'; return; }
+      open++;
+      h += '<div class="card pday" style="margin-bottom:10px"><div class="row spread"><h3>' + esc(dayTitle(k)) + '</h3><button class="btn sm ghost" data-act="go-day" data-date="' + k + '">Ver día</button></div>';
       MEALS.forEach(function (m) {
         var s = d && d.m[m.k]; if (s && s.r) planned++;
         h += '<div class="prow"><div class="pl">' + m.n + "<span>" + m.h + '</span></div><select data-in="plan" data-date="' + k + '" data-m="' + m.k + '" aria-label="' + m.n + " del " + esc(dayLabel(k)) + '"><option value="">— Sin elegir —</option>' + recipesOf(m.k).map(function (r) { return '<option value="' + esc(r.id) + '"' + (s && s.r === r.id ? " selected" : "") + ">" + esc((r.o ? r.o + ". " : "") + r.n) + "</option>"; }).join("") + "</select></div>";
       });
       h += "</div>";
     });
-    h += '<p class="meta" style="text-align:center">' + planned + " de " + days.length * 5 + " comidas planeadas</p>";
+    if (open) h += '<p class="meta" style="text-align:center">' + planned + " de " + open * 5 + " comidas planeadas</p>";
     h += '<button class="btn primary block" data-tab-go="compras">Ver lista de compras</button>';
     return h;
   }
@@ -810,24 +816,9 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     if (s.r !== id) { s.r = id; s.s = keepSubs || {}; }
     cleanDay(k); persist();
   }
-  function fillPlan() {
-    var days = rangeDays(S.plan.from, S.plan.to), n = 0;
-    MEALS.forEach(function (m) {
-      var list = recipesOf(m.k); if (!list.length) return;
-      // sigue la rotación a partir de la última opción usada antes del rango
-      var idx = 0, prev = S.days.filter(function (d) { return d.id < S.plan.from && d.m[m.k] && d.m[m.k].r; }).sort(function (a, b) { return a.id < b.id ? 1 : -1; })[0];
-      if (prev) { var pi = list.map(function (r) { return r.id; }).indexOf(prev.m[m.k].r); if (pi > -1) idx = pi + 1; }
-      days.forEach(function (k) {
-        var s = slot(k, m.k, false);
-        if (s && s.r) { var ci = list.map(function (r) { return r.id; }).indexOf(s.r); if (ci > -1) idx = ci + 1; return; }
-        setRecipe(k, m.k, list[idx % list.length].id); idx++; n++;
-      });
-    });
-    render(); toast(n ? n + " comidas agregadas al plan" : "El rango ya estaba completo");
-  }
   function quickRange(q) {
     var t = dayKey(Date.now()), a, b;
-    if (q === "week") { a = t; b = dayKey(addDays(weekStart(t), 6)); }
+    if (q === "week") { a = weekStart(t); b = dayKey(addDays(a, 6)); }
     else if (q === "next") { a = dayKey(addDays(weekStart(t), 7)); b = dayKey(addDays(a, 6)); }
     else { a = t; b = dayKey(addDays(t, 6)); }
     S.plan = { from: a, to: b }; persist(); render();
@@ -903,7 +894,6 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       case "e-delete-no": ui.confirm = false; editSheet(); break;
       case "e-delete-do": deleteRecipe(); break;
       case "quick": quickRange(d.q); break;
-      case "fill": fillPlan(); break;
       case "clear-plan": {
         rangeDays(S.plan.from, S.plan.to).forEach(function (k) { var dd = dayById(k); if (!dd) return; Object.keys(dd.m).forEach(function (m) { if (!dd.m[m].d) { dd.m[m].r = ""; dd.m[m].s = {}; } }); cleanDay(k); });
         persist(); render(); toast("Plan vaciado (se conservan las comidas ya hechas)"); break;

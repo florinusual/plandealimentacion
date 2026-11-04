@@ -6,7 +6,7 @@ App para llevar el plan de recomposición corporal basado en equivalentes. Es un
 
 - **Hoy:** eliges la receta de cada tiempo de comida (Desayuno 9:00, Colación 1 12:00, Comida 15:30, Colación 2 18:00, Cena 21:00), la marcas como hecha y ves las porciones del día cubiertas contra tu tabla de equivalentes.
 - **Recetas:** las 25 recetas con ingredientes y preparación. En cada ingrediente, **Cambiar** muestra los alimentos del mismo grupo con la cantidad equivalente. También puedes crear y editar recetas; la app te dice si cuadran con las porciones de ese tiempo de comida.
-- **Semana:** eliges un rango de días (por ejemplo, de miércoles a sábado) y la receta de cada comida. “Rellenar vacíos” va rotando las opciones.
+- **Semana:** eliges un rango de días (por ejemplo, de miércoles a sábado) y la receta de cada comida. “Esta semana” abarca de lunes a domingo; los días que ya pasaron sin nada registrado aparecen como “Sin registros”.
 - **Compras:** suma todo lo que piden las recetas del plan, con los cambios de ingrediente de cada día, agrupado por grupo de alimento. Se puede palomear y compartir.
 - **Progreso:** racha, apego semanal y de 30 días, y registro de peso y medidas.
 
