@@ -226,7 +226,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 7;
+  var APP_VERSION = 8;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -348,8 +348,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     // En la lista de compras se redondea hacia arriba a medidas fáciles de comprar.
     if (shop) { var st = v >= 10 ? 1 : /pieza|lata|paquete|rebanada|mitad/.test(f.u) ? 0.5 : 0.25; v = Math.ceil(v / st - 1e-6) * st; }
     var ft = fracTxt(v);
-    // Si la medida casera sale en quintos (2/5 de pieza, 4/5 de taza…), se muestra en gramos: es más fácil pesarlo.
-    if (/\/5$/.test(ft) && g) return { m: g, g: "" };
+    // Si la medida casera sale en quintos (2/5 de pieza…) o en decimales (0.9 taza…), se muestra en gramos: es más fácil pesarlo.
+    if ((/\/5$/.test(ft) || /\./.test(ft)) && g) return { m: g, g: "" };
     return { m: ft + " " + (v > 1.0001 ? plUnit(f.u) : f.u), g: g };
   }
   function qtyTxt(f, p) { var q = qty(f, p); return q.m + (q.g ? " · " + q.g : ""); }
