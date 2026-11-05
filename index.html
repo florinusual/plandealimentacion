@@ -175,9 +175,10 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 /* semana */
 .pday { padding: 12px 14px; }
 .pday h3 { margin-bottom: 8px; }
-.prow { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; align-items: center; margin-top: 6px; }
+.prow { display: grid; grid-template-columns: 74px minmax(0, 1fr) 40px; gap: 8px; align-items: center; margin-top: 6px; }
 .prow .pl { font-size: 11px; font-weight: 700; color: var(--muted); line-height: 1.2; }
 .prow .pl span { display: block; font-family: var(--mono); font-weight: 500; color: var(--accent); }
+.prow .pomit { min-height: 42px; display: flex; align-items: center; padding: 6px 10px; border-radius: 12px; border: 1.5px dashed var(--yellow-line); color: var(--yellow-ink); font-size: 13px; overflow-wrap: anywhere; }
 .prow select { min-height: 42px; padding: 8px 10px; font-size: 14px; }
 /* compras */
 .shop { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); width: 100%; text-align: left; }
@@ -226,7 +227,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 9;
+  var APP_VERSION = 10;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -417,15 +418,25 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function slot(k, m, create) { var d = dayEntry(k, create); if (!d) return null; if (!d.m[m] && create) d.m[m] = { r: "", s: {}, d: false }; return d.m[m] || null; }
   function cleanDay(k) {
     var d = dayById(k); if (!d) return;
-    Object.keys(d.m).forEach(function (m) { var s = d.m[m]; if (!s.r && !s.d) delete d.m[m]; });
+    Object.keys(d.m).forEach(function (m) { var s = d.m[m]; if (!s.r && !s.d && !s.o) delete d.m[m]; });
     if (!Object.keys(d.m).length && !d.skip) S.days = S.days.filter(function (x) { return x.id !== k; });
   }
-  /* Días omitidos (comiste fuera, oficina, salida…): no cuentan para compras ni para el apego. */
-  var SKIPS = ["Comí fuera", "Oficina", "Salida con amigos", "Otro motivo"];
+  /* Días omitidos (día de oficina o día libre): no cuentan para compras ni para el apego.
+     Tiempos de comida omitidos: no cuentan para el apego, pero sí siguen en la lista de compras. */
+  var SKIPS = ["Día de oficina", "Día libre"];
+  function omitOf(k, m) { var d = dayById(k), s = d && d.m[m]; return s && s.o ? s.o : ""; }
+  function mealsExpected(k) { return MEALS.filter(function (m) { return !omitOf(k, m.k); }).length; }
+  function mealSkipSheet(k, m) {
+    ui.skipMeal = { date: k, m: m };
+    openSheet("<h2>Omitir " + esc(MBY[m].n.toLowerCase()) + "</h2><p class='sub'>" + esc(dayTitle(k)) + " · " + MBY[m].h + ". No contará en tu apego al plan. Sus ingredientes siguen en tu lista de compras.</p><div class='stack'>" +
+      '<label class="field"><span class="label">¿Por qué lo omites?</span><input id="omq" maxlength="80" placeholder="Ej. comida con amigos" autocomplete="off"></label>' +
+      '<button class="btn primary block" data-act="meal-skip-set">Omitir ' + esc(MBY[m].n.toLowerCase()) + '</button><button class="btn ghost block" data-act="close">Cancelar</button></div>');
+    setTimeout(function () { var i = $("#omq"); if (i) i.focus(); }, 30);
+  }
   function skipOf(k) { var d = dayById(k); return d && d.skip ? d.skip : ""; }
   function skipSheet(k) {
     ui.skipDay = k;
-    openSheet("<h2>Omitir día</h2><p class='sub'>" + esc(dayTitle(k)) + ". Este día no contará en tu lista de compras ni en tu apego al plan. ¿Por qué lo omites?</p><div class='olist'>" +
+    openSheet("<h2>Omitir día</h2><p class='sub'>" + esc(dayTitle(k)) + ". Todo el día no contará en tu lista de compras ni en tu apego al plan. Elige el motivo:</p><div class='olist'>" +
       SKIPS.map(function (x) { return '<button class="opt" data-act="skip-set" data-r="' + esc(x) + '"><span class="dot" style="background:var(--yellow)"></span><span class="on">' + esc(x) + "</span><span></span></button>"; }).join("") + "</div>");
   }
   function subFood(it, subs, i) { var f = subs && subs[i] && FBY[subs[i]]; return f || FBY[it.f]; }
@@ -450,13 +461,14 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     h += '<div class="daynav"><button class="btn sm icon" data-act="day" data-d="-1" aria-label="Día anterior">‹</button><div class="dl">' + esc(dayLabel(k, true)) + '</div><button class="btn sm icon" data-act="day" data-d="1" aria-label="Día siguiente">›</button></div>';
     if (k !== today) h += '<div class="note"><span>Estás viendo otro día.</span><button data-act="day-today">Volver a hoy</button></div>';
     if (d && d.skip) return h + '<div class="empty card"><b>Día omitido</b>' + esc(d.skip) + '. Este día no cuenta para tus compras ni para tu apego.<div style="margin-top:14px"><button class="btn" data-act="skip-undo" data-date="' + k + '">Deshacer omisión</button></div></div>';
-    var pl = planOn(k), eqd = eqDay(pl), done = {}, nDone = 0;
+    var pl = planOn(k), eqd = {}, done = {}, nDone = 0, nExp = mealsExpected(k);
+    MEALS.forEach(function (m) { if (omitOf(k, m.k)) return; var e = eqOf(pl, m.k); Object.keys(e).forEach(function (g) { eqd[g] = (eqd[g] || 0) + (+e[g] || 0); }); });
     h += '<div style="margin:-6px 0 12px;text-align:center"><button class="tag" style="font-size:10.5px;padding:4px 10px" data-act="plans">Plan: ' + planTag(pl) + " ›</button></div>";
     MEALS.forEach(function (m) {
       var s = d && d.m[m.k], r = s && s.r && recipeById(s.r);
-      if (s && s.d) { nDone++; var t = r ? totals(itemsFor(r, pl)) : eqOf(pl, m.k); Object.keys(t).forEach(function (g) { done[g] = (done[g] || 0) + t[g]; }); }
+      if (s && s.d && !s.o) { nDone++; var t = r ? totals(itemsFor(r, pl)) : eqOf(pl, m.k); Object.keys(t).forEach(function (g) { done[g] = (done[g] || 0) + t[g]; }); }
     });
-    h += '<div class="card stack" style="margin-bottom:16px"><div class="row spread"><h2 style="margin:0">Porciones del día</h2><span class="tag' + (nDone === 5 ? " ok" : "") + '">' + nDone + " de 5 comidas</span></div><div class='gtrack'>";
+    h += '<div class="card stack" style="margin-bottom:16px"><div class="row spread"><h2 style="margin:0">Porciones del día</h2><span class="tag' + (nExp && nDone === nExp ? " ok" : "") + '">' + nDone + " de " + nExp + (nExp === 1 ? " comida" : " comidas") + "</span></div><div class='gtrack'>";
     GROUPS.forEach(function (g) {
       if (!eqd[g.k] && !done[g.k]) return;
       var need = eqd[g.k] || 0, have = Math.round((done[g.k] || 0) * 100) / 100, pct = need ? Math.min(100, have / need * 100) : 0;
@@ -465,6 +477,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     h += "</div></div>";
     MEALS.forEach(function (m) {
       var s = d && d.m[m.k], r = s && s.r && recipeById(s.r), nsub = s && s.s ? Object.keys(s.s).length : 0;
+      if (s && s.o) { h += '<div class="card meal" style="margin-bottom:10px;opacity:.85"><div class="row spread"><div class="mhead"><span class="mtime">' + m.h + '</span><span class="mname">' + m.n + '</span></div><span class="tag" style="background:var(--yellow-soft);color:var(--yellow-ink)">Omitida</span></div><p class="msg" style="font-size:13px">' + esc(s.o) + (r ? " · receta planeada: " + esc(r.n) : "") + '</p><button class="btn sm ghost" style="align-self:flex-start" data-act="meal-skip-undo" data-date="' + k + '" data-m="' + m.k + '">Deshacer omisión</button></div>'; return; }
       h += '<div class="card meal' + (s && s.d ? " done" : "") + '" style="margin-bottom:10px">';
       h += '<div class="row spread"><div class="mhead"><span class="mtime">' + m.h + '</span><span class="mname">' + m.n + "</span></div>";
       h += '<button class="check' + (s && s.d ? " on" : "") + '" data-act="toggle-done" data-m="' + m.k + '" aria-label="Marcar ' + m.n + ' como hecha" aria-pressed="' + !!(s && s.d) + '">✓</button></div>';
@@ -688,15 +701,16 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       // Días que ya pasaron sin nada planeado ni registrado: solo el título y "Sin registros".
       if (d && d.skip) { h += '<div class="card pday" style="margin-bottom:10px;opacity:.8"><div class="row spread"><div class="stack" style="gap:4px"><h3 style="margin:0">' + esc(dayTitle(k)) + '</h3><span><span class="tag" style="background:var(--yellow-soft);color:var(--yellow-ink)">Día omitido · ' + esc(d.skip) + '</span></span></div><button class="btn sm ghost" data-act="skip-undo" data-date="' + k + '">Deshacer</button></div></div>'; return; }
       if (k < today && !d) { h += '<div class="card pday" style="margin-bottom:10px;opacity:.75"><div class="row spread"><div class="stack" style="gap:4px"><h3 style="margin:0">' + esc(dayTitle(k)) + '</h3><span><span class="tag">Sin registros</span></span></div><button class="btn sm ghost" data-act="skip-day" data-date="' + k + '">Omitir día</button></div></div>'; return; }
-      open++;
       h += '<div class="card pday" style="margin-bottom:10px"><div class="row spread"><h3>' + esc(dayTitle(k)) + '</h3><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="skip-day" data-date="' + k + '">Omitir día</button><button class="btn sm ghost" data-act="go-day" data-date="' + k + '">Ver día</button></span></div>';
       MEALS.forEach(function (m) {
-        var s = d && d.m[m.k]; if (s && s.r) planned++;
-        h += '<div class="prow"><div class="pl">' + m.n + "<span>" + m.h + '</span></div><select data-in="plan" data-date="' + k + '" data-m="' + m.k + '" aria-label="' + m.n + " del " + esc(dayLabel(k)) + '"><option value="">— Sin elegir —</option>' + recipesOf(m.k).map(function (r) { return '<option value="' + esc(r.id) + '"' + (s && s.r === r.id ? " selected" : "") + ">" + esc((r.o ? r.o + ". " : "") + r.n) + "</option>"; }).join("") + "</select></div>";
+        var s = d && d.m[m.k];
+        if (s && s.o) { h += '<div class="prow"><div class="pl">' + m.n + "<span>" + m.h + '</span></div><div class="pomit"><span>Omitida · ' + esc(s.o) + (s.r && recipeById(s.r) ? '<br><small class="meta">Sigue en compras: ' + esc(recipeById(s.r).n) + "</small>" : "") + '</span></div><button class="btn sm icon ghost" data-act="meal-skip-undo" data-date="' + k + '" data-m="' + m.k + '" aria-label="Deshacer omisión de ' + m.n + '" title="Deshacer">↺</button></div>'; return; }
+        open++; if (s && s.r) planned++;
+        h += '<div class="prow"><div class="pl">' + m.n + "<span>" + m.h + '</span></div><select data-in="plan" data-date="' + k + '" data-m="' + m.k + '" aria-label="' + m.n + " del " + esc(dayLabel(k)) + '"><option value="">— Sin elegir —</option>' + recipesOf(m.k).map(function (r) { return '<option value="' + esc(r.id) + '"' + (s && s.r === r.id ? " selected" : "") + ">" + esc((r.o ? r.o + ". " : "") + r.n) + "</option>"; }).join("") + '</select><button class="btn sm icon ghost" data-act="meal-skip" data-date="' + k + '" data-m="' + m.k + '" aria-label="Omitir ' + m.n + '" title="Omitir">✕</button></div>';
       });
       h += "</div>";
     });
-    if (open) h += '<p class="meta" style="text-align:center">' + planned + " de " + open * 5 + " comidas planeadas</p>";
+    if (open) h += '<p class="meta" style="text-align:center">' + planned + " de " + open + " comidas planeadas</p>";
     h += '<button class="btn primary block" data-tab-go="compras">Ver lista de compras</button>';
     return h;
   }
@@ -769,18 +783,21 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   }
 
   /* Progreso: apego al plan, racha, peso y medidas */
-  function doneCount(k) { var d = dayById(k); if (!d) return 0; return MEALS.filter(function (m) { return d.m[m.k] && d.m[m.k].d; }).length; }
+  function doneCount(k) { var d = dayById(k); if (!d) return 0; return MEALS.filter(function (m) { return d.m[m.k] && d.m[m.k].d && !d.m[m.k].o; }).length; }
+  // Un día "cuenta como completo" si hiciste todas las comidas que no omitiste; si omitiste todo, es como un día omitido.
+  function dayFree(k) { return !!skipOf(k) || mealsExpected(k) === 0; }
+  function dayFull(k) { var e = mealsExpected(k); return e > 0 && doneCount(k) === e; }
   function streak() {
     // Los días omitidos no suman ni rompen la racha.
-    var t = dayKey(Date.now()), n = 0, k = doneCount(t) === 5 || skipOf(t) ? t : dayKey(addDays(t, -1)), guard = 0;
-    while ((doneCount(k) === 5 || skipOf(k)) && guard++ < 3650) { if (!skipOf(k)) n++; k = dayKey(addDays(k, -1)); }
+    var t = dayKey(Date.now()), n = 0, k = dayFull(t) || dayFree(t) ? t : dayKey(addDays(t, -1)), guard = 0;
+    while ((dayFull(k) || dayFree(k)) && guard++ < 3650) { if (!dayFree(k)) n++; k = dayKey(addDays(k, -1)); }
     return n;
   }
   function weekStart(k) { var d = new Date(parseDay(k)), wd = (d.getDay() + 6) % 7; return dayKey(addDays(k, -wd)); }
   function adherence(from, to) {
-    var days = rangeDays(from, to).filter(function (k) { return !skipOf(k); }), done = 0;
-    days.forEach(function (k) { done += doneCount(k); });
-    return days.length ? Math.round(done / (days.length * 5) * 100) : null;
+    var days = rangeDays(from, to).filter(function (k) { return !skipOf(k); }), done = 0, exp = 0;
+    days.forEach(function (k) { done += doneCount(k); exp += mealsExpected(k); });
+    return exp ? Math.round(done / exp * 100) : null;
   }
   function pctTxt(v) { return v == null ? "—" : v + "%"; }
   function firstLog() { var ks = S.days.filter(function (d) { return Object.keys(d.m).some(function (m) { return d.m[m].d; }); }).map(function (d) { return d.id; }).sort(); return ks[0] || ""; }
@@ -1035,6 +1052,13 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       }
       case "plan-del": { S.plans = S.plans.filter(function (x) { return x.id !== ui.pv; }); S.recipes.forEach(function (r) { if (r.ov) delete r.ov[ui.pv]; }); persist(); plansSheet(); render(); toast("Tabla borrada"); break; }
       case "skip-day": skipSheet(d.date); break;
+      case "meal-skip": mealSkipSheet(d.date, d.m); break;
+      case "meal-skip-set": {
+        var sm = ui.skipMeal, why = (($("#omq") || {}).value || "").trim() || "Sin motivo";
+        var so = slot(sm.date, sm.m, true); so.o = why; so.d = false;
+        persist(); closeSheet(); render(); toast(MBY[sm.m].n + " omitida"); break;
+      }
+      case "meal-skip-undo": { var su = slot(d.date, d.m, false); if (su) { delete su.o; cleanDay(d.date); persist(); } render(); toast("Omisión deshecha"); break; }
       case "skip-set": { var dd0 = dayEntry(ui.skipDay, true); dd0.skip = d.r; persist(); closeSheet(); render(); toast("Día omitido"); break; }
       case "skip-undo": { var dd1 = dayById(d.date); if (dd1) { delete dd1.skip; cleanDay(d.date); persist(); } render(); toast("Omisión deshecha"); break; }
       case "clear-plan": {
@@ -1103,7 +1127,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       persist(); render();
     }
   });
-  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && ui.sheet) { var x = $("#sheet .sheetx"); if (x) x.click(); } });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" && ev.target.id === "omq") { ev.preventDefault(); act("meal-skip-set", ev.target); return; } if (ev.key === "Escape" && ui.sheet) { var x = $("#sheet .sheetx"); if (x) x.click(); } });
 
   /* ---------- respaldo ---------- */
   function exportBackup() {
