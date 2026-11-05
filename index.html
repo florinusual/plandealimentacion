@@ -227,7 +227,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 13;
+  var APP_VERSION = 14;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -243,6 +243,9 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     { k: "c2", n: "Colación 2", h: "18:00" }, { k: "cen", n: "Cena", h: "21:00" }
   ];
   var MBY = {}; MEALS.forEach(function (m) { MBY[m.k] = m; });
+  /* Cómo se compra/prepara la pechuga de pollo en cada receta: cocida para deshebrar o en bisteces/filete. */
+  var PREPS = { deshebrar: "Para cocer y deshebrar", bistec: "En bisteces / filete" };
+  var PREP_FOODS = { "pechuga-de-pollo": 1 };
   /* Tablas de equivalentes. La primera (la de las recetas originales) es la de Recomposición.
      Se pueden agregar otras (déficit calórico, volumen); la vigente se elige desde una fecha. */
   var TIPOS = { deficit: "Déficit calórico", recomposicion: "Recomposición", volumen: "Volumen" };
@@ -283,6 +286,12 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       if (have.indexOf(r.id) < 0) { S.recipes.push(clone(r)); n++; }
     });
     S.seen = seen;
+    // Agrega la preparación del pollo a las recetas base que ya estaban guardadas en el teléfono.
+    var BY = {}; (window.RX_RECIPES || []).forEach(function (r) { BY[r.id] = r; });
+    S.recipes.forEach(function (r) {
+      var b = BY[r.id]; if (!b) return;
+      r.it.forEach(function (it, i) { var bi = b.it[i]; if (bi && bi.pr && it.f && it.f === bi.f && !it.pr) { it.pr = bi.pr; mergeBase.patched = true; } });
+    });
     return n;
   }
   function normalize(d) {
@@ -380,7 +389,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     return r.it.map(function (it) {
       var f = it.f && FBY[it.f]; if (!f) return it;
       var b = base[f.g], t = +eq[f.g] || 0;
-      return { f: it.f, p: b ? Math.round(it.p * t / b * 10000) / 10000 : 0, auto: true };
+      var o = { f: it.f, p: b ? Math.round(it.p * t / b * 10000) / 10000 : 0, auto: true }; if (it.pr) o.pr = it.pr; return o;
     });
   }
   function isScaled(r, pl) { return pl && recipeBase(r) !== pl.id && !(r.ov && r.ov[pl.id]); }
@@ -544,7 +553,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       var orig = FBY[it.f], f = subFood(it, subs, i); if (!f) return;
       var q = qty(f, it.p), was = f.id !== it.f;
       if (was && orig) changed.push(orig.n + " → " + f.n);
-      h += '<div class="ing"><div class="in">' + esc(f.n) + '</div><button class="swap" data-act="swap" data-i="' + i + '">Cambiar</button>';
+      h += '<div class="ing"><div class="in">' + esc(f.n) + (!was && it.pr && PREPS[it.pr] ? ' <span class="tag" style="vertical-align:middle">' + esc(PREPS[it.pr]) + "</span>" : "") + '</div><button class="swap" data-act="swap" data-i="' + i + '">Cambiar</button>';
       h += '<div class="iq"><b>' + esc(q.m) + "</b>" + (q.g ? " · " + esc(q.g) : "") + " · " + gpill(f.g, porTxt(it.p) + " " + f.g) + "</div>";
       if (was && orig) h += '<div class="was">En lugar de ' + esc(orig.n) + " (" + esc(qtyTxt(orig, it.p)) + ")</div>";
       h += "</div>";
@@ -660,6 +669,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     e.it.forEach(function (it, i) {
       if (!it.f) return;
       var f = FBY[it.f];
+      if (PREP_FOODS[it.f]) h += '<label class="field" style="margin-bottom:-4px"><span class="meta">Preparación de ' + esc(f.n.toLowerCase()) + '</span><select data-in="pr" data-i="' + i + '"><option value="">Sin especificar</option>' + Object.keys(PREPS).map(function (k) { return '<option value="' + k + '"' + (it.pr === k ? " selected" : "") + ">" + PREPS[k] + "</option>"; }).join("") + "</select></label>";
       h += '<div class="eitem"><button class="pick" data-act="e-pick" data-i="' + i + '">' + esc(f ? f.n : "Elegir alimento") + "<small id='eq" + i + "'>" + esc(f ? qtyTxt(f, +it.p || 0) + " · " + f.g : "") + '</small></button><input type="number" inputmode="decimal" step="0.25" min="0" data-in="p" data-i="' + i + '" value="' + esc(it.p) + '" aria-label="Porciones"><button class="btn sm icon danger" data-act="e-del" data-i="' + i + '" aria-label="Quitar">✕</button></div>';
     });
     h += '<button class="btn block" data-act="e-add">+ Agregar alimento</button>';
@@ -726,7 +736,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   /* Compras: suma lo que piden las recetas planeadas en el rango, con los cambios de ingrediente de cada día. */
   /* Solo cuenta lo que falta por comer: no entran los días que ya pasaron ni las comidas marcadas como hechas. */
   function shopData() {
-    var days = rangeDays(S.plan.from, S.plan.to), today = dayKey(Date.now()), byFood = {}, free = {}, nMeals = 0, nDays = 0, nSkip = 0;
+    var days = rangeDays(S.plan.from, S.plan.to), today = dayKey(Date.now()), byFood = {}, byPrep = {}, free = {}, nMeals = 0, nDays = 0, nSkip = 0;
     days.forEach(function (k) {
       var d = dayById(k), any = false; if (!d) return;
       MEALS.forEach(function (m) {
@@ -738,13 +748,14 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
           if (!it.f) { freeParts(it.t).forEach(function (t) { addFree(free, t); }); return; }
           var f = subFood(it, s.s, i); if (!f) return;
           byFood[f.id] = (byFood[f.id] || 0) + (+it.p || 0);
+          if (PREP_FOODS[f.id]) { var pk = f.id === it.f && it.pr ? it.pr : "otro"; var bp = byPrep[f.id] = byPrep[f.id] || {}; bp[pk] = (bp[pk] || 0) + (+it.p || 0); }
         });
       });
       if (any) nDays++;
     });
     var merged = {}, extra = {};
     Object.keys(free).forEach(function (k) { var fid = FREE_FOOD[free[k].t]; if (fid && byFood[fid]) { merged[k] = 1; extra[fid] = free[k]; } });
-    return { byFood: byFood, free: free, merged: merged, extra: extra, nMeals: nMeals, nDays: nDays, nSkip: nSkip, key: S.plan.from + "|" + S.plan.to };
+    return { byFood: byFood, byPrep: byPrep, free: free, merged: merged, extra: extra, nMeals: nMeals, nDays: nDays, nSkip: nSkip, key: S.plan.from + "|" + S.plan.to };
   }
   /* "Sal, pimienta y limón" → Sal · Pimienta · Limón, para juntar los condimentos repetidos. */
   /* Homologar ingredientes libres: "1/4 de cebolla", "Pedacito de cebolla" y "Cebolla" son lo mismo.
@@ -803,8 +814,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       if (!list.length) return;
       h += '<div class="rhead"><span class="dot" style="background:var(--g-' + g.k + ')"></span>' + esc(g.n) + "<i></i></div><div>";
       list.forEach(function (id) {
-        var f = FBY[id], q = qty(f, sd.byFood[id], true), on = !!S.shop.chk[id], ex = sd.extra[id];
-        h += '<button class="shop' + (on ? " on" : "") + '" data-act="shop-chk" data-f="' + esc(id) + '" aria-pressed="' + on + '"><span class="box">✓</span><span class="sn">' + esc(f.n) + (ex ? '<small class="meta" style="display:block;font-weight:500">+ ' + esc(freeQtyTxt(ex)) + " para sazonar (" + ex.n + (ex.n === 1 ? " receta" : " recetas") + ")</small>" : "") + '</span><span class="sq"><b>' + esc(q.m) + "</b>" + (q.g ? "<small>" + esc(q.g) + "</small>" : "") + "</span></button>";
+        var f = FBY[id], q = qty(f, sd.byFood[id], true), on = !!S.shop.chk[id], ex = sd.extra[id], bp = prepLines(f, sd.byPrep[id]);
+        h += '<button class="shop' + (on ? " on" : "") + '" data-act="shop-chk" data-f="' + esc(id) + '" aria-pressed="' + on + '"><span class="box">✓</span><span class="sn">' + esc(f.n) + bp.map(function (x) { return '<small class="meta" style="display:block;font-weight:500">' + esc(x) + "</small>"; }).join("") + (ex ? '<small class="meta" style="display:block;font-weight:500">+ ' + esc(freeQtyTxt(ex)) + " para sazonar (" + ex.n + (ex.n === 1 ? " receta" : " recetas") + ")</small>" : "") + '</span><span class="sq"><b>' + esc(q.m) + "</b>" + (q.g ? "<small>" + esc(q.g) + "</small>" : "") + "</span></button>";
       });
       h += "</div>";
     });
@@ -819,13 +830,20 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     }
     return h;
   }
+  // Desglose de un alimento por preparación, solo si hay más de una o alguna está especificada.
+  function prepLines(f, bp) {
+    if (!bp) return [];
+    var ks = Object.keys(bp).filter(function (k) { return bp[k] > 0; });
+    if (!ks.length || (ks.length === 1 && ks[0] === "otro")) return [];
+    return ["deshebrar", "bistec", "otro"].filter(function (k) { return bp[k] > 0; }).map(function (k) { return (k === "otro" ? "Sin especificar" : PREPS[k]) + ": " + qty(f, bp[k], true).m; });
+  }
   function shopText() {
     var sd = shopData(), out = ["Lista de compras · " + dayLabel(S.plan.from) + " al " + dayLabel(S.plan.to)];
     GROUPS.forEach(function (g) {
       var list = Object.keys(sd.byFood).filter(function (id) { return FBY[id].g === g.k; }).sort(function (a, b) { return FBY[a].n.localeCompare(FBY[b].n, "es"); });
       if (!list.length) return;
       out.push("", g.n.toUpperCase());
-      list.forEach(function (id) { var q = qty(FBY[id], sd.byFood[id], true), ex = sd.extra[id]; out.push((S.shop.chk[id] ? "✓ " : "• ") + FBY[id].n + ": " + q.m + (q.g ? " (" + q.g + ")" : "") + (ex ? " + " + freeQtyTxt(ex) + " para sazonar" : "")); });
+      list.forEach(function (id) { var q = qty(FBY[id], sd.byFood[id], true), ex = sd.extra[id]; out.push((S.shop.chk[id] ? "✓ " : "• ") + FBY[id].n + ": " + q.m + (q.g ? " (" + q.g + ")" : "") + (ex ? " + " + freeQtyTxt(ex) + " para sazonar" : "")); prepLines(FBY[id], sd.byPrep[id]).forEach(function (x) { out.push("   – " + x); }); });
     });
     var fk = Object.keys(sd.free).filter(function (k) { return !sd.merged[k]; }).sort();
     if (fk.length) { out.push("", "DESPENSA Y CONDIMENTOS"); fk.forEach(function (k) { out.push("• " + sd.free[k].t + ": " + freeQtyTxt(sd.free[k])); }); }
@@ -974,7 +992,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function saveEdit() {
     var e = ui.edit, name = (e.n || "").trim();
     if (!name) { toast("Ponle nombre a la receta."); return; }
-    var items = e.it.filter(function (it) { return it.f ? FBY[it.f] && +it.p > 0 : (it.t || "").trim(); }).map(function (it) { return it.f ? { f: it.f, p: Math.round(+it.p * 10000) / 10000 } : { t: it.t.trim(), c: (it.c || "").trim() || "al gusto" }; });
+    var items = e.it.filter(function (it) { return it.f ? FBY[it.f] && +it.p > 0 : (it.t || "").trim(); }).map(function (it) { return it.f ? (function () { var o = { f: it.f, p: Math.round(+it.p * 10000) / 10000 }; if (PREP_FOODS[it.f] && it.pr) o.pr = it.pr; return o; })() : { t: it.t.trim(), c: (it.c || "").trim() || "al gusto" }; });
     if (!items.some(function (it) { return it.f; })) { toast("Agrega al menos un alimento con porciones."); return; }
     var steps = e.st.map(function (x) { return x.trim(); }).filter(Boolean);
     var r = e.isNew ? null : recipeById(e.id);
@@ -1175,6 +1193,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var t = ev.target, k = t.dataset && t.dataset.in;
     if (t.id === "rsf") { readRestore(t.files && t.files[0]); t.value = ""; return; }
     if (k === "meal") { ui.edit.m = t.value; $("#evalid").innerHTML = editValid(); }
+    else if (k === "pr") { var ip = ui.edit.it[+t.dataset.i]; if (t.value) ip.pr = t.value; else delete ip.pr; }
     else if (k === "pe-tipo") ui.pe.tipo = t.value;
     else if (k === "plan") { setRecipe(t.dataset.date, t.dataset.m, t.value); render(); }
     else if (k === "plan-from" || k === "plan-to") {
@@ -1400,6 +1419,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   /* ---------- arranque ---------- */
   var added = mergeBase();
+  if (mergeBase.patched && !added) persist();
   if (added) { persist(); setTimeout(function () { toast(added === 1 ? "Se agregó 1 receta nueva al recetario" : "Se agregaron " + added + " recetas nuevas al recetario"); }, 600); }
   render();
   // Si ya iniciaste sesión antes (aquí o en el Diario, mismo proyecto), la sincronización arranca sola.
