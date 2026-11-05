@@ -1,6 +1,6 @@
 /* Service worker del Recetario: guarda la app para abrirla sin conexión.
    Solo toca sus propias cachés (prefijo "recetario-"), porque comparte dominio con el Diario de Lectura. */
-var VERSION = "recetario-v11";
+var VERSION = "recetario-v12";
 var SHELL = ["./", "index.html", "datos.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"];
 var FONTS = "recetario-fonts";
 
@@ -19,8 +19,9 @@ self.addEventListener("fetch", function (ev) {
   if (req.method !== "GET") return;
 
   // Páginas: primero la red (para recibir actualizaciones); sin conexión, la copia guardada.
+  // "no-cache" pide a GitHub Pages confirmar si hay una versión nueva, en lugar de usar su copia de hasta 10 minutos.
   if (req.mode === "navigate") {
-    ev.respondWith(fetch(req).then(function (res) {
+    ev.respondWith(fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then(function (res) {
       var copy = res.clone();
       caches.open(VERSION).then(function (c) { c.put("index.html", copy); });
       return res;
@@ -41,7 +42,7 @@ self.addEventListener("fetch", function (ev) {
 
   // Archivos de la app: red primero para recibir cambios, caché si no hay conexión.
   if (url.origin === location.origin) {
-    ev.respondWith(fetch(req).then(function (res) {
+    ev.respondWith(fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then(function (res) {
       if (res.ok) { var copy = res.clone(); caches.open(VERSION).then(function (c) { c.put(req, copy); }); }
       return res;
     }).catch(function () { return caches.open(VERSION).then(function (c) { return c.match(req); }); }));
