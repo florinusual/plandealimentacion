@@ -226,7 +226,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 6;
+  var APP_VERSION = 7;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -330,7 +330,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var w = Math.floor(v + 1e-6), fr = v - w, best = null;
     if (fr < 0.04) return String(w || fmtNum(v));
     if (fr > 0.96) return String(w + 1);
-    [[1, 2], [1, 3], [2, 3], [1, 4], [3, 4], [1, 6], [1, 8]].forEach(function (c) { var d = Math.abs(fr - c[0] / c[1]); if (d < 0.04 && (!best || d < best.d)) best = { d: d, t: c[0] + "/" + c[1] }; });
+    [[1, 2], [1, 3], [2, 3], [1, 4], [3, 4], [1, 5], [2, 5], [3, 5], [4, 5], [1, 6], [1, 8]].forEach(function (c) { var d = Math.abs(fr - c[0] / c[1]); if (d < 0.04 && (!best || d < best.d)) best = { d: d, t: c[0] + "/" + c[1] }; });
     return best ? (w ? w + " " : "") + best.t : fmtNum(v);
   }
   function plWord(w) { if (/[aeiouáéó]$/.test(w)) return w + "s"; if (/z$/.test(w)) return w.slice(0, -1) + "ces"; return w + "es"; }
@@ -347,7 +347,10 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var v = f.q * p;
     // En la lista de compras se redondea hacia arriba a medidas fáciles de comprar.
     if (shop) { var st = v >= 10 ? 1 : /pieza|lata|paquete|rebanada|mitad/.test(f.u) ? 0.5 : 0.25; v = Math.ceil(v / st - 1e-6) * st; }
-    return { m: fracTxt(v) + " " + (v > 1.0001 ? plUnit(f.u) : f.u), g: g };
+    var ft = fracTxt(v);
+    // Si la medida casera sale en quintos (2/5 de pieza, 4/5 de taza…), se muestra en gramos: es más fácil pesarlo.
+    if (/\/5$/.test(ft) && g) return { m: g, g: "" };
+    return { m: ft + " " + (v > 1.0001 ? plUnit(f.u) : f.u), g: g };
   }
   function qtyTxt(f, p) { var q = qty(f, p); return q.m + (q.g ? " · " + q.g : ""); }
   function porTxt(p) { var t = fracTxt(p); return t + (p > 1.0001 ? " porciones" : " porción"); }
