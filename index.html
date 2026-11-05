@@ -113,7 +113,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 .rhead i { flex: 1; border-top: 1.5px dashed var(--line); }
 .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
 /* pestañas */
-#tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr);
+#tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(6, 1fr);
   padding: 6px max(6px, env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(6px, env(safe-area-inset-right, 0px)); }
 #tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 52px; font-size: 10px; font-weight: 700; color: var(--muted); border-radius: 12px; position: relative; }
 #tabs button[aria-current="page"] { color: var(--accent); }
@@ -206,6 +206,21 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 .eqg .ev { text-align: center; font-family: var(--mono); font-size: 12.5px; padding: 8px 0; border-radius: 8px; background: var(--field); }
 .eqg .ev.z { color: var(--line); background: transparent; }
 .eqg input { min-height: 40px; padding: 4px 2px; text-align: center; border-radius: 10px; }
+.wring { display: grid; place-items: center; position: relative; margin: 4px auto 6px; width: 190px; height: 190px; }
+.wring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.wring .wc { text-align: center; }
+.wring .wc b { display: block; font-family: var(--display); font-weight: 400; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.wring .wc span { font-size: 12px; color: var(--muted); }
+.wadd { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.wadd .btn { flex-direction: column; gap: 0; min-height: 60px; padding: 0 4px; line-height: 1.15; }
+.wadd .btn small { font-weight: 500; font-size: 11px; opacity: .85; }
+.wlog { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.wlog:last-child { border-bottom: 0; }
+.wlog .wt { font-family: var(--mono); font-size: 12px; color: var(--muted); width: 48px; }
+.wlog b { flex: 1; font-variant-numeric: tabular-nums; }
+.wweek { display: grid; grid-template-columns: 44px minmax(0, 1fr) 62px; gap: 6px 10px; align-items: center; font-size: 12px; }
+.wweek .wd { color: var(--muted); text-transform: capitalize; }
+.wweek .wv { text-align: right; font-variant-numeric: tabular-nums; }
 .up { color: var(--warn); } .down { color: var(--good); }
 </style>
 </head>
@@ -215,6 +230,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <button id="fab" class="btn primary fab" data-act="new-recipe" hidden>+ Receta</button>
 <nav id="tabs" aria-label="Secciones">
   <button data-tab="hoy"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>Hoy</button>
+  <button data-tab="agua"><svg viewBox="0 0 24 24"><path d="M12 3.5c-3 4-6 7.4-6 10.8a6 6 0 0 0 12 0c0-3.4-3-6.8-6-10.8z"/><path d="M9.2 15.2a2.9 2.9 0 0 0 2.8 2.6"/></svg>Agua</button>
   <button data-tab="recetas"><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z"/><path d="M9 8h6M9 12h6"/></svg>Recetas</button>
   <button data-tab="semana"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Semana</button>
   <button data-tab="compras"><svg viewBox="0 0 24 24"><path d="M3 4h2.5l2.2 11h10.6L20 8H7"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>Compras</button>
@@ -227,7 +243,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 14;
+  var APP_VERSION = 15;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -263,7 +279,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   /* ---------- estado ---------- */
   var S = loadLocal() || seed();
-  var ui = { tab: "hoy", date: dayKey(Date.now()), meal: "des", sheet: null, edit: null, rv: null, tmp: {}, sub: null, pick: null, q: "", pg: "", confirm: false, tip: null, wtip: null, restore: null, body: null };
+  var ui = { tab: "hoy", wdate: dayKey(Date.now()), date: dayKey(Date.now()), meal: "des", sheet: null, edit: null, rv: null, tmp: {}, sub: null, pick: null, q: "", pg: "", confirm: false, tip: null, wtip: null, restore: null, body: null };
   var toastT = null, saveT = null;
 
   function $(s) { return document.querySelector(s); }
@@ -273,7 +289,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   function seed() {
     var t = dayKey(Date.now());
-    return { v: 1, fresh: true, recipes: clone(window.RX_RECIPES || []), seen: baseIds(), days: [], body: [], plan: { from: t, to: dayKey(addDays(t, 6)) }, shop: { key: "", chk: {} }, plans: defaultPlans(), planHist: [{ from: "2000-01-01", id: BASE_PLAN }] };
+    return { v: 1, fresh: true, recipes: clone(window.RX_RECIPES || []), seen: baseIds(), days: [], body: [], water: [], waterGoal: 2500, plan: { from: t, to: dayKey(addDays(t, 6)) }, shop: { key: "", chk: {} }, plans: defaultPlans(), planHist: [{ from: "2000-01-01", id: BASE_PLAN }] };
   }
   function baseIds() { return (window.RX_RECIPES || []).map(function (r) { return r.id; }); }
   /* Recetas que se agreguen después a datos.js: llegan solas a los teléfonos que ya usan la app.
@@ -303,6 +319,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       seen: Array.isArray(d.seen) ? d.seen : baseIds().filter(function (id) { return /^(des|c1|com|c2|cen)[1-5]$/.test(id); }),
       days: Array.isArray(d.days) ? d.days : [],
       body: Array.isArray(d.body) ? d.body : [],
+      water: Array.isArray(d.water) ? d.water : [],
+      waterGoal: +d.waterGoal > 0 ? +d.waterGoal : 2500,
       plan: d.plan && d.plan.from ? d.plan : { from: t, to: dayKey(addDays(t, 6)) },
       shop: d.shop && d.shop.chk ? d.shop : { key: "", chk: {} },
       plans: Array.isArray(d.plans) && d.plans.length ? d.plans : defaultPlans(),
@@ -464,6 +482,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     $("#fab").hidden = ui.tab !== "recetas";
     var h = "";
     if (ui.tab === "hoy") h = viewHoy();
+    else if (ui.tab === "agua") h = viewAgua();
     else if (ui.tab === "recetas") h = viewRecetas();
     else if (ui.tab === "semana") h = viewSemana();
     else if (ui.tab === "compras") h = viewCompras();
@@ -507,6 +526,52 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       h += "</div>";
     });
     return h;
+  }
+
+  /* Agua: registro de lo que tomas en el día contra tu meta. */
+  function mlTxt(v) { return v >= 1000 ? fmtNum(v / 1000) + " L" : Math.round(v) + " ml"; }
+  function waterOf(k) { return S.water.filter(function (x) { return x.date === k; }).sort(function (a, b) { return a.t - b.t; }); }
+  function waterTotal(k) { return waterOf(k).reduce(function (a, x) { return a + (+x.ml || 0); }, 0); }
+  function viewAgua() {
+    var k = ui.wdate, today = dayKey(Date.now()), goal = S.waterGoal, tot = waterTotal(k), pct = goal ? Math.min(1, tot / goal) : 0, h = "";
+    h += "<h1>Agua</h1>";
+    h += '<div class="daynav"><button class="btn sm icon" data-act="wday" data-d="-1" aria-label="Día anterior">‹</button><div class="dl">' + esc(dayLabel(k, true)) + '</div><button class="btn sm icon" data-act="wday" data-d="1" aria-label="Día siguiente"' + (k >= today ? " disabled" : "") + ">›</button></div>";
+    if (k !== today) h += '<div class="note"><span>Estás viendo otro día.</span><button data-act="wday-today">Volver a hoy</button></div>';
+    var R = 84, C = 2 * Math.PI * R;
+    h += '<div class="card" style="margin-bottom:14px"><div class="wring"><svg viewBox="0 0 190 190" aria-hidden="true"><circle cx="95" cy="95" r="' + R + '" fill="none" stroke="var(--line)" stroke-width="12"/><circle cx="95" cy="95" r="' + R + '" fill="none" stroke="' + (tot >= goal ? "var(--good)" : "var(--accent)") + '" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + (C * pct).toFixed(1) + " " + C.toFixed(1) + '"/></svg>';
+    h += '<div class="wc"><b>' + mlTxt(tot) + "</b><span>de " + mlTxt(goal) + " · " + Math.round(pct * 100) + "%</span></div></div>";
+    h += '<p class="meta" style="text-align:center;margin:0 0 12px">' + (tot >= goal ? "¡Meta cumplida!" : "Te faltan " + mlTxt(goal - tot)) + ' · <button style="color:var(--accent);font-weight:700;padding:0" data-act="wgoal">Cambiar meta</button></p>';
+    h += '<div class="wadd"><button class="btn" data-act="wadd" data-ml="250">+ 250 ml<small>vaso</small></button><button class="btn" data-act="wadd" data-ml="500">+ 500 ml<small>botella</small></button><button class="btn" data-act="wadd" data-ml="1000">+ 1 L<small>termo</small></button></div>';
+    h += '<button class="btn ghost block" style="margin-top:8px" data-act="wother">Otra cantidad</button></div>';
+    var log = waterOf(k);
+    h += '<h2>Registro del día</h2><div class="card" style="margin-bottom:14px">';
+    if (!log.length) h += '<p class="meta" style="margin:0">Aún no registras agua este día.</p>';
+    log.slice().reverse().forEach(function (x) {
+      var d = new Date(x.t);
+      h += '<div class="wlog"><span class="wt">' + pad(d.getHours()) + ":" + pad(d.getMinutes()) + "</span><b>" + mlTxt(x.ml) + '</b><button class="btn sm icon ghost" data-act="wdel" data-id="' + esc(x.id) + '" aria-label="Borrar ' + mlTxt(x.ml) + '">✕</button></div>';
+    });
+    h += "</div>";
+    // últimos 7 días
+    var days = []; for (var i = 6; i >= 0; i--) days.push(dayKey(addDays(today, -i)));
+    var met = days.filter(function (d) { return waterTotal(d) >= goal; }).length, avg = days.reduce(function (a, d) { return a + waterTotal(d); }, 0) / 7;
+    h += '<h2>Últimos 7 días</h2><div class="card"><p class="meta" style="margin:0 0 10px">Promedio ' + mlTxt(avg) + " al día · meta cumplida " + met + " de 7 días</p><div class='wweek'>";
+    days.forEach(function (d) {
+      var v = waterTotal(d), pc = goal ? Math.min(100, v / goal * 100) : 0;
+      h += '<span class="wd">' + esc(dayLabel(d).slice(0, 3)) + " " + new Date(parseDay(d)).getDate() + '</span><div class="bar"><i class="' + (v >= goal ? "full" : "") + '" style="width:' + pc + '%"></i></div><span class="wv">' + (v ? mlTxt(v) : "—") + "</span>";
+    });
+    return h + "</div></div>";
+  }
+  function waterOtherSheet() {
+    openSheet('<h2>Otra cantidad</h2><div class="stack"><label class="field"><span class="label">Mililitros</span><input id="wml" type="number" inputmode="numeric" min="1" step="50" placeholder="Ej. 350"></label><button class="btn primary block" data-act="wother-set">Agregar</button><button class="btn ghost block" data-act="close">Cancelar</button></div>');
+    setTimeout(function () { var i = $("#wml"); if (i) i.focus(); }, 30);
+  }
+  function waterGoalSheet() {
+    openSheet('<h2>Meta diaria de agua</h2><div class="stack"><p class="msg" style="font-size:12.5px">Ajústala a lo que te indique tu plan.</p><label class="field"><span class="label">Mililitros al día</span><input id="wgl" type="number" inputmode="numeric" min="250" step="250" value="' + S.waterGoal + '"></label><div class="chips" style="margin:0">' + [2000, 2500, 3000, 3500].map(function (v) { return '<button class="chip" data-act="wgoal-pick" data-ml="' + v + '">' + mlTxt(v) + "</button>"; }).join("") + '</div><button class="btn primary block" data-act="wgoal-set">Guardar</button></div>');
+  }
+  function addWater(ml) {
+    ml = Math.round(+ml); if (!(ml > 0) || ml > 5000) { toast("Escribe una cantidad válida."); return false; }
+    var k = ui.wdate, now = new Date(), t = k === dayKey(Date.now()) ? now.getTime() : parseDay(k) - 12 * 3600000 + (now.getHours() * 60 + now.getMinutes()) * 60000;
+    S.water.push({ id: "w" + uid(), date: k, ml: ml, t: t }); persist(); render(); toast("+" + mlTxt(ml)); return true;
   }
 
   /* Recetas */
@@ -722,7 +787,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       h += '<div class="card pday" style="margin-bottom:10px"><div class="row spread"><h3>' + esc(dayTitle(k)) + '</h3><span class="row" style="gap:6px"><button class="btn sm ghost" data-act="skip-day" data-date="' + k + '">Omitir día</button><button class="btn sm ghost" data-act="go-day" data-date="' + k + '">Ver día</button></span></div>';
       MEALS.forEach(function (m) {
         var s = d && d.m[m.k];
-        if (s && s.o) { h += '<div class="prow"><div class="pl">' + m.n + "<span>" + m.h + '</span></div><div class="pomit"><span>Omitida · ' + esc(s.o) + (s.r && recipeById(s.r) ? '<br><small class="meta">Sigue en compras: ' + esc(recipeById(s.r).n) + "</small>" : "") + '</span></div><button class="btn sm icon ghost" data-act="meal-skip-undo" data-date="' + k + '" data-m="' + m.k + '" aria-label="Deshacer omisión de ' + m.n + '" title="Deshacer">↺</button></div>'; return; }
+        if (s && s.o) { h += '<div class="prow"><div class="pl">' + m.n + "<span>" + m.h + '</span></div><div class="pomit"><span>Omitida · ' + esc(s.o) + '</span></div><button class="btn sm icon ghost" data-act="meal-skip-undo" data-date="' + k + '" data-m="' + m.k + '" aria-label="Deshacer omisión de ' + m.n + '" title="Deshacer">↺</button></div>'; return; }
         open++; if (s && s.r) planned++;
         h += '<div class="prow"><div class="pl">' + m.n + "<span>" + m.h + '</span></div><select data-in="plan" data-date="' + k + '" data-m="' + m.k + '" aria-label="' + m.n + " del " + esc(dayLabel(k)) + '"><option value="">— Sin elegir —</option>' + recipesOf(m.k).map(function (r) { return '<option value="' + esc(r.id) + '"' + (s && s.r === r.id ? " selected" : "") + ">" + esc((r.o ? r.o + ". " : "") + r.n) + "</option>"; }).join("") + '</select><button class="btn sm icon ghost" data-act="meal-skip" data-date="' + k + '" data-m="' + m.k + '" aria-label="Omitir ' + m.n + '" title="Omitir">✕</button></div>';
       });
@@ -1037,7 +1102,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   document.addEventListener("click", function (ev) {
     var tb = ev.target.closest("[data-tab]");
-    if (tb && tb.closest("#tabs")) { ui.tab = tb.dataset.tab; ui.tip = null; ui.wtip = null; if (ui.tab === "hoy") ui.date = dayKey(Date.now()); render(); window.scrollTo(0, 0); return; }
+    if (tb && tb.closest("#tabs")) { ui.tab = tb.dataset.tab; ui.tip = null; ui.wtip = null; if (ui.tab === "hoy") ui.date = dayKey(Date.now()); if (ui.tab === "agua") ui.wdate = dayKey(Date.now()); render(); window.scrollTo(0, 0); return; }
     var tg = ev.target.closest("[data-tab-go]");
     if (tg) { ui.tab = tg.dataset.tabGo; render(); window.scrollTo(0, 0); return; }
     var el = ev.target.closest("[data-act]"); if (!el) { if (ev.target.id === "sheet") act("close", ev.target); return; }
@@ -1146,6 +1211,15 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       case "shop-share": shareShop(); break;
       case "tip": ui.tip = ui.tip === +d.i ? null : +d.i; render(); break;
       case "wtip": ui.wtip = ui.wtip === +d.i ? null : +d.i; render(); break;
+      case "wday": { var nd = dayKey(addDays(ui.wdate, +d.d)); if (nd <= dayKey(Date.now())) ui.wdate = nd; render(); break; }
+      case "wday-today": ui.wdate = dayKey(Date.now()); render(); break;
+      case "wadd": addWater(d.ml); break;
+      case "wother": waterOtherSheet(); break;
+      case "wother-set": { if (addWater((($("#wml") || {}).value || "").replace(",", "."))) closeSheet(), render(); break; }
+      case "wdel": S.water = S.water.filter(function (x) { return x.id !== d.id; }); persist(); render(); toast("Registro borrado"); break;
+      case "wgoal": waterGoalSheet(); break;
+      case "wgoal-pick": { var gi = $("#wgl"); if (gi) gi.value = d.ml; break; }
+      case "wgoal-set": { var gv = Math.round(+((($("#wgl") || {}).value || "").replace(",", "."))); if (!(gv >= 250 && gv <= 10000)) { toast("Escribe una meta entre 250 y 10,000 ml."); break; } S.waterGoal = gv; persist(); closeSheet(); render(); toast("Meta: " + mlTxt(gv)); break; }
       case "body-new": ui.body = { isNew: true, id: uid(), date: dayKey(Date.now()) }; bodySheet(); break;
       case "body-edit": { var b = S.body.filter(function (x) { return x.id === d.id; })[0]; if (b) { ui.body = clone(b); bodySheet(); } break; }
       case "body-save": {
@@ -1206,7 +1280,9 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   });
   document.addEventListener("keydown", function (ev) {
     if (ev.key === "Enter" && ev.target.id === "omq") { ev.preventDefault(); act("meal-skip-set", ev.target); return; }
-    if (ev.key === "Enter" && ev.target.id === "skq") { ev.preventDefault(); act("skip-other-set", ev.target); return; } if (ev.key === "Escape" && ui.sheet) { var x = $("#sheet .sheetx"); if (x) x.click(); } });
+    if (ev.key === "Enter" && ev.target.id === "skq") { ev.preventDefault(); act("skip-other-set", ev.target); return; }
+    if (ev.key === "Enter" && ev.target.id === "wml") { ev.preventDefault(); act("wother-set", ev.target); return; }
+    if (ev.key === "Enter" && ev.target.id === "wgl") { ev.preventDefault(); act("wgoal-set", ev.target); return; } if (ev.key === "Escape" && ui.sheet) { var x = $("#sheet .sheetx"); if (x) x.click(); } });
 
   /* ---------- respaldo ---------- */
   function exportBackup() {
@@ -1244,7 +1320,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     appId: "1:31723804365:web:1ee94fcbd0812b23dbbb84"
   };
   var FB_JS = "https://www.gstatic.com/firebasejs/10.14.1/", LS_SYNC = "recetario-sync", LS_PRE = "recetario-antes-de-sincronizar";
-  var SYNC_COLLS = ["rx_recipes", "rx_days", "rx_body", "rx_meta"], ARR = { rx_recipes: "recipes", rx_days: "days", rx_body: "body" };
+  var SYNC_COLLS = ["rx_recipes", "rx_days", "rx_body", "rx_water", "rx_meta"], ARR = { rx_recipes: "recipes", rx_days: "days", rx_body: "body", rx_water: "water" };
   var cloud = { loading: null, ready: false, user: null, db: null, unsubs: [], state: "off", err: "", last: 0, pushT: null };
   function hashStr(str) {
     var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
@@ -1298,12 +1374,12 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function curMaps() {
     var m = {};
     Object.keys(ARR).forEach(function (c) { m[c] = {}; (S[ARR[c]] || []).forEach(function (x) { if (x && x.id) m[c][String(x.id)] = JSON.stringify(x); }); });
-    m.rx_meta = { plan: JSON.stringify(S.plan), shop: JSON.stringify(S.shop), seen: JSON.stringify(S.seen || []), plans: JSON.stringify(S.plans), planHist: JSON.stringify(S.planHist) };
+    m.rx_meta = { plan: JSON.stringify(S.plan), shop: JSON.stringify(S.shop), seen: JSON.stringify(S.seen || []), plans: JSON.stringify(S.plans), planHist: JSON.stringify(S.planHist), waterGoal: JSON.stringify(S.waterGoal) };
     return m;
   }
   function applyItem(c, id, v) {
     var x = v === null ? null : JSON.parse(v);
-    if (c === "rx_meta") { if (x && (id === "plan" || id === "shop")) S[id] = x;
+    if (c === "rx_meta") { if (x && (id === "plan" || id === "shop")) S[id] = x; if (id === "waterGoal" && +x > 0) S.waterGoal = +x;
       if (x && (id === "plans" || id === "planHist") && Array.isArray(x) && x.length) S[id] = x;
       if (x && id === "seen" && Array.isArray(x)) x.forEach(function (k) { if ((S.seen || (S.seen = [])).indexOf(k) < 0) S.seen.push(k); });
       return; }
