@@ -227,7 +227,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 11;
+  var APP_VERSION = 12;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -1365,7 +1365,15 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   window.addEventListener("online", function () { if (cloud.user) syncPush(); else syncUi(); });
   document.addEventListener("visibilitychange", function () { if (!document.hidden && ui.tab === "hoy" && !ui.sheet) render(); });
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
-    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function (reg) {
+        // Al volver a la app se busca una versión nueva.
+        document.addEventListener("visibilitychange", function () { if (!document.hidden) reg.update().catch(function () {}); });
+      }).catch(function () {});
+    });
+    // Cuando se instala una versión nueva, se recarga una vez para mostrarla.
+    var hadCtrl = !!navigator.serviceWorker.controller, reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () { if (hadCtrl && !reloaded) { reloaded = true; location.reload(); } });
   }
 })();
 </script>
