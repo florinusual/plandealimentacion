@@ -227,7 +227,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 12;
+  var APP_VERSION = 13;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -735,16 +735,58 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
         nMeals++; any = true;
         itemsFor(r, planOn(k)).forEach(function (it, i) {
           if (it.f && !(it.p > 0)) return;
-          if (!it.f) { freeParts(it.t).forEach(function (t) { var key = norm(t); (free[key] = free[key] || { t: t, n: 0 }).n++; }); return; }
+          if (!it.f) { freeParts(it.t).forEach(function (t) { addFree(free, t); }); return; }
           var f = subFood(it, s.s, i); if (!f) return;
           byFood[f.id] = (byFood[f.id] || 0) + (+it.p || 0);
         });
       });
       if (any) nDays++;
     });
-    return { byFood: byFood, free: free, nMeals: nMeals, nDays: nDays, nSkip: nSkip, key: S.plan.from + "|" + S.plan.to };
+    var merged = {}, extra = {};
+    Object.keys(free).forEach(function (k) { var fid = FREE_FOOD[free[k].t]; if (fid && byFood[fid]) { merged[k] = 1; extra[fid] = free[k]; } });
+    return { byFood: byFood, free: free, merged: merged, extra: extra, nMeals: nMeals, nDays: nDays, nSkip: nSkip, key: S.plan.from + "|" + S.plan.to };
   }
   /* "Sal, pimienta y limón" → Sal · Pimienta · Limón, para juntar los condimentos repetidos. */
+  /* Homologar ingredientes libres: "1/4 de cebolla", "Pedacito de cebolla" y "Cebolla" son lo mismo.
+     Se quita la cantidad y las descripciones, se juntan los sinónimos y se suman las cantidades por unidad. */
+  var FREE_CANON = [
+    [/\bajo\b/, "Ajo"], [/cebolla/, "Cebolla"], [/jitomate|tomate/, "Jitomate"], [/limon/, "Limón"],
+    [/cilantro/, "Cilantro"], [/pimienta/, "Pimienta"], [/^sal\b|\bsal de\b/, "Sal"], [/canela/, "Canela"],
+    [/stevia|endulzante|edulcorante/, "Endulzante (stevia)"], [/oregano/, "Orégano"], [/albahaca/, "Albahaca"],
+    [/laurel/, "Laurel"], [/tomillo/, "Tomillo"], [/perejil/, "Perejil"], [/mostaza/, "Mostaza"], [/chipotle/, "Chile chipotle"],
+    [/habanero/, "Chile habanero"], [/serrano/, "Chile serrano"], [/miel/, "Miel"], [/soya/, "Salsa de soya"], [/vainilla/, "Vainilla"],
+    [/polvo para hornear/, "Polvo para hornear"], [/lechada/, "Bebida vegetal (almendra o soya)"], [/^chorrito de leche|^leche$/, "Leche"],
+    [/lechuga/, "Lechuga"], [/cocoa/, "Cocoa sin azúcar"], [/chocolate/, "Chocolate amargo (70% cacao o más)"], [/yogurt/, "Yogurt natural sin azúcar"],
+    [/hierbas de olor/, "Hierbas de olor"], [/paprika/, "Paprika"], [/jengibre/, "Jengibre"]
+  ];
+  // Libres que son el mismo producto que un alimento de la lista: se suman en ese renglón.
+  var FREE_FOOD = { "Cebolla": "cebolla-morada-blanca", "Jitomate": "tomate-jitomate", "Lechuga": "lechuga" };
+  var FREE_UNITS = { diente: "diente", dientes: "diente", hoja: "hoja", hojas: "hoja", ramita: "ramita", ramitas: "ramita", cucharada: "cucharada", cucharadas: "cucharada", cucharadita: "cucharadita", cucharaditas: "cucharadita", cdita: "cucharadita", cditas: "cucharadita", pizca: "pizca", pizcas: "pizca", g: "g" };
+  function canonFree(t) {
+    var x = norm(t).trim(), q = null;
+    var m = x.match(/^(\d+\s\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s+(?:([a-z]+)\s+)?(?:de\s+)?(.*)$/);
+    if (m) {
+      var u = m[2] && FREE_UNITS[m[2]] ? FREE_UNITS[m[2]] : "", rest = u ? m[3] : ((m[2] && !FREE_UNITS[m[2]] ? m[2] + " " : "") + m[3]);
+      q = { n: num(m[1]), u: u || "pieza" }; x = rest;
+    }
+    x = x.replace(/^(pedacito|chorrito|jugo)\s+de\s+(un\s+)?/, function (a, w) { return w === "chorrito" ? "chorrito de " : ""; });
+    if (/^diente(s)? de ajo/.test(x)) { if (q && q.u === "pieza") q.u = "diente"; }
+    for (var i = 0; i < FREE_CANON.length; i++) if (FREE_CANON[i][0].test(x)) return { name: FREE_CANON[i][1], q: q };
+    x = x.replace(/\b(finamente\s+)?(picad[oa]s?|molid[oa]s?|rallad[oa]|sec[oa]|en polvo|para la salsa|al gusto|bola maduro)\b/g, "").replace(/\s+/g, " ").trim();
+    var raw = String(t).trim(), name = raw.replace(/^[\d\s\/.]+(de\s+)?/i, "").replace(/\s+(finamente\s+)?(picad[oa]s?|molid[oa]s?|rallad[oa]|al gusto)$/i, "").trim() || raw;
+    return { name: name.charAt(0).toUpperCase() + name.slice(1), q: q };
+  }
+  function num(s0) { return String(s0).split(/\s+/).reduce(function (a, p) { var f = p.split("/"); return a + (f.length === 2 ? +f[0] / +f[1] : +p); }, 0); }
+  function addFree(free, t) {
+    var c = canonFree(t), key = norm(c.name), x = free[key] = free[key] || { t: c.name, n: 0, q: {}, gusto: false };
+    x.n++;
+    if (c.q && c.q.n > 0) x.q[c.q.u] = (x.q[c.q.u] || 0) + c.q.n; else x.gusto = true;
+  }
+  function freeQtyTxt(x) {
+    var parts = Object.keys(x.q).map(function (u) { var v = x.q[u]; return u === "g" ? fmtNum(v) + " g" : fracTxt(v) + " " + (v > 1.0001 ? plWord(u) : u); });
+    if (x.gusto || !parts.length) parts.push("al gusto");
+    return parts.join(" + ");
+  }
   function freeParts(t) {
     return String(t).replace(/\([^)]*\)|-?\s*opcional/gi, "").split(/,|\s+y\s+/).map(function (x) { x = x.trim(); return x ? x.charAt(0).toUpperCase() + x.slice(1) : ""; }).filter(Boolean);
   }
@@ -761,17 +803,17 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       if (!list.length) return;
       h += '<div class="rhead"><span class="dot" style="background:var(--g-' + g.k + ')"></span>' + esc(g.n) + "<i></i></div><div>";
       list.forEach(function (id) {
-        var f = FBY[id], q = qty(f, sd.byFood[id], true), on = !!S.shop.chk[id];
-        h += '<button class="shop' + (on ? " on" : "") + '" data-act="shop-chk" data-f="' + esc(id) + '" aria-pressed="' + on + '"><span class="box">✓</span><span class="sn">' + esc(f.n) + '</span><span class="sq"><b>' + esc(q.m) + "</b>" + (q.g ? "<small>" + esc(q.g) + "</small>" : "") + "</span></button>";
+        var f = FBY[id], q = qty(f, sd.byFood[id], true), on = !!S.shop.chk[id], ex = sd.extra[id];
+        h += '<button class="shop' + (on ? " on" : "") + '" data-act="shop-chk" data-f="' + esc(id) + '" aria-pressed="' + on + '"><span class="box">✓</span><span class="sn">' + esc(f.n) + (ex ? '<small class="meta" style="display:block;font-weight:500">+ ' + esc(freeQtyTxt(ex)) + " para sazonar (" + ex.n + (ex.n === 1 ? " receta" : " recetas") + ")</small>" : "") + '</span><span class="sq"><b>' + esc(q.m) + "</b>" + (q.g ? "<small>" + esc(q.g) + "</small>" : "") + "</span></button>";
       });
       h += "</div>";
     });
-    var fk = Object.keys(sd.free).sort();
+    var fk = Object.keys(sd.free).filter(function (k) { return !sd.merged[k]; }).sort();
     if (fk.length) {
       h += '<div class="rhead">Despensa y condimentos<i></i></div><p class="meta" style="margin:0 0 6px">No cuentan porción; revisa que tengas suficiente.</p><div>';
       fk.forEach(function (k) {
         var x = sd.free[k], id = "libre:" + k, on = !!S.shop.chk[id];
-        h += '<button class="shop' + (on ? " on" : "") + '" data-act="shop-chk" data-f="' + esc(id) + '" aria-pressed="' + on + '"><span class="box">✓</span><span class="sn">' + esc(x.t) + '</span><span class="sq"><small>en ' + x.n + (x.n === 1 ? " receta" : " recetas") + "</small></span></button>";
+        h += '<button class="shop' + (on ? " on" : "") + '" data-act="shop-chk" data-f="' + esc(id) + '" aria-pressed="' + on + '"><span class="box">✓</span><span class="sn">' + esc(x.t) + '</span><span class="sq"><b>' + esc(freeQtyTxt(x)) + '</b><small>en ' + x.n + (x.n === 1 ? " receta" : " recetas") + "</small></span></button>";
       });
       h += "</div>";
     }
@@ -783,10 +825,10 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       var list = Object.keys(sd.byFood).filter(function (id) { return FBY[id].g === g.k; }).sort(function (a, b) { return FBY[a].n.localeCompare(FBY[b].n, "es"); });
       if (!list.length) return;
       out.push("", g.n.toUpperCase());
-      list.forEach(function (id) { var q = qty(FBY[id], sd.byFood[id], true); out.push((S.shop.chk[id] ? "✓ " : "• ") + FBY[id].n + ": " + q.m + (q.g ? " (" + q.g + ")" : "")); });
+      list.forEach(function (id) { var q = qty(FBY[id], sd.byFood[id], true), ex = sd.extra[id]; out.push((S.shop.chk[id] ? "✓ " : "• ") + FBY[id].n + ": " + q.m + (q.g ? " (" + q.g + ")" : "") + (ex ? " + " + freeQtyTxt(ex) + " para sazonar" : "")); });
     });
-    var fk = Object.keys(sd.free).sort();
-    if (fk.length) { out.push("", "DESPENSA Y CONDIMENTOS"); fk.forEach(function (k) { out.push("• " + sd.free[k].t); }); }
+    var fk = Object.keys(sd.free).filter(function (k) { return !sd.merged[k]; }).sort();
+    if (fk.length) { out.push("", "DESPENSA Y CONDIMENTOS"); fk.forEach(function (k) { out.push("• " + sd.free[k].t + ": " + freeQtyTxt(sd.free[k])); }); }
     return out.join("\n");
   }
 
