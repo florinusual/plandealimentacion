@@ -1,6 +1,6 @@
 /* Service worker del Recetario: guarda la app para abrirla sin conexión.
    Solo toca sus propias cachés (prefijo "recetario-"), porque comparte dominio con el Diario de Lectura. */
-var VERSION = "recetario-v5";
+var VERSION = "recetario-v6";
 var SHELL = ["./", "index.html", "datos.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"];
 var FONTS = "recetario-fonts";
 
