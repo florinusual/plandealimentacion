@@ -198,6 +198,13 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 .bentry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); text-align: left; width: 100%; }
 .bentry:last-child { border-bottom: 0; }
 .bentry b { font-variant-numeric: tabular-nums; }
+.eqg { display: grid; grid-template-columns: minmax(0, 1fr) repeat(5, 40px); gap: 4px; align-items: center; font-size: 12px; }
+.eqg .eh { font-size: 9.5px; font-weight: 700; color: var(--muted); text-align: center; text-transform: uppercase; letter-spacing: .03em; }
+.eqg .en { display: flex; align-items: center; gap: 6px; min-width: 0; line-height: 1.15; padding: 6px 0; }
+.eqg .en small { display: block; color: var(--muted); font-size: 10.5px; }
+.eqg .ev { text-align: center; font-family: var(--mono); font-size: 12.5px; padding: 8px 0; border-radius: 8px; background: var(--field); }
+.eqg .ev.z { color: var(--line); background: transparent; }
+.eqg input { min-height: 40px; padding: 4px 2px; text-align: center; border-radius: 10px; }
 .up { color: var(--warn); } .down { color: var(--good); }
 </style>
 </head>
@@ -219,7 +226,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 4;
+  var APP_VERSION = 5;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -235,14 +242,18 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     { k: "c2", n: "Colación 2", h: "18:00" }, { k: "cen", n: "Cena", h: "21:00" }
   ];
   var MBY = {}; MEALS.forEach(function (m) { MBY[m.k] = m; });
-  var EQ = {
+  /* Tablas de equivalentes. La primera (la de las recetas originales) es la de Recomposición.
+     Se pueden agregar otras (déficit calórico, volumen); la vigente se elige desde una fecha. */
+  var TIPOS = { deficit: "Déficit calórico", recomposicion: "Recomposición", volumen: "Volumen" };
+  var EQ_RECOMP = {
     des: { V: 2, C: 2, PM: 3, GS: 1 },
     c1: { F: 1, LD: 1 },
     com: { V: 2, C: 3, L: 1, PMB: 3, GS: 2 },
     c2: { F: 1, GP: 1 },
     cen: { V: 2, C: 1, PMB: 3, GS: 1 }
   };
-  var EQDAY = {}; MEALS.forEach(function (m) { Object.keys(EQ[m.k]).forEach(function (g) { EQDAY[g] = (EQDAY[g] || 0) + EQ[m.k][g]; }); });
+  var BASE_PLAN = "recomp";
+  function defaultPlans() { return [{ id: BASE_PLAN, n: "Recomposición", tipo: "recomposicion", eq: clone(EQ_RECOMP) }]; }
   var FOODS = window.RX_FOODS || [], FBY = {};
   FOODS.forEach(function (f) { FBY[f.id] = f; });
 
@@ -258,7 +269,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   function seed() {
     var t = dayKey(Date.now());
-    return { v: 1, fresh: true, recipes: clone(window.RX_RECIPES || []), seen: baseIds(), days: [], body: [], plan: { from: t, to: dayKey(addDays(t, 6)) }, shop: { key: "", chk: {} } };
+    return { v: 1, fresh: true, recipes: clone(window.RX_RECIPES || []), seen: baseIds(), days: [], body: [], plan: { from: t, to: dayKey(addDays(t, 6)) }, shop: { key: "", chk: {} }, plans: defaultPlans(), planHist: [{ from: "2000-01-01", id: BASE_PLAN }] };
   }
   function baseIds() { return (window.RX_RECIPES || []).map(function (r) { return r.id; }); }
   /* Recetas que se agreguen después a datos.js: llegan solas a los teléfonos que ya usan la app.
@@ -283,7 +294,9 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       days: Array.isArray(d.days) ? d.days : [],
       body: Array.isArray(d.body) ? d.body : [],
       plan: d.plan && d.plan.from ? d.plan : { from: t, to: dayKey(addDays(t, 6)) },
-      shop: d.shop && d.shop.chk ? d.shop : { key: "", chk: {} }
+      shop: d.shop && d.shop.chk ? d.shop : { key: "", chk: {} },
+      plans: Array.isArray(d.plans) && d.plans.length ? d.plans : defaultPlans(),
+      planHist: Array.isArray(d.planHist) && d.planHist.length ? d.planHist : [{ from: "2000-01-01", id: BASE_PLAN }]
     };
   }
   function loadLocal() { try { var r = localStorage.getItem(LS); return r ? normalize(JSON.parse(r)) : null; } catch (e) { return null; } }
@@ -342,25 +355,51 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   /* ---------- recetas ---------- */
   function recipeById(id) { return S.recipes.filter(function (r) { return r.id === id; })[0]; }
   function recipesOf(m) { return S.recipes.filter(function (r) { return r.m === m; }).sort(function (a, b) { return (a.o || 99) - (b.o || 99) || a.n.localeCompare(b.n); }); }
+  /* ---------- planes ---------- */
+  function planById(id) { return S.plans.filter(function (p) { return p.id === id; })[0]; }
+  function planOn(k) {
+    var h = S.planHist.filter(function (x) { return x.from <= k && planById(x.id); }).sort(function (a, b) { return a.from < b.from ? -1 : 1; });
+    return planById(h.length ? h[h.length - 1].id : BASE_PLAN) || S.plans[0];
+  }
+  function activePlan() { return planOn(dayKey(Date.now())); }
+  function planSince(k) { var h = S.planHist.filter(function (x) { return x.from <= k; }).sort(function (a, b) { return a.from < b.from ? -1 : 1; }); return h.length ? h[h.length - 1].from : ""; }
+  function eqOf(pl, m) { return (pl && pl.eq && pl.eq[m]) || {}; }
+  function eqDay(pl) { var t = {}; MEALS.forEach(function (m) { var e = eqOf(pl, m.k); Object.keys(e).forEach(function (g) { t[g] = (t[g] || 0) + (+e[g] || 0); }); }); return t; }
+  function planTag(pl) { return esc(pl.n) + (pl.tipo && TIPOS[pl.tipo] && TIPOS[pl.tipo] !== pl.n ? " · " + TIPOS[pl.tipo] : ""); }
+  /* Porciones de una receta en un plan: la receta se escribió para su plan base (r.pl, por defecto Recomposición).
+     En otro plan se usa el ajuste propio si existe (r.ov[plan]) o se escalan las porciones de cada grupo a lo que pide la tabla. */
+  function recipeBase(r) { return r.pl || BASE_PLAN; }
+  function itemsFor(r, pl) {
+    if (!pl || recipeBase(r) === pl.id) return r.it;
+    if (r.ov && r.ov[pl.id]) return r.ov[pl.id];
+    var base = totals(r.it), eq = eqOf(pl, r.m);
+    return r.it.map(function (it) {
+      var f = it.f && FBY[it.f]; if (!f) return it;
+      var b = base[f.g], t = +eq[f.g] || 0;
+      return { f: it.f, p: b ? Math.round(it.p * t / b * 10000) / 10000 : 0, auto: true };
+    });
+  }
+  function isScaled(r, pl) { return pl && recipeBase(r) !== pl.id && !(r.ov && r.ov[pl.id]); }
   function totals(items) {
     var t = {};
     (items || []).forEach(function (it) { var f = it.f && FBY[it.f]; if (f) t[f.g] = (t[f.g] || 0) + (+it.p || 0); });
     return t;
   }
-  function checkRecipe(r) {
-    var t = totals(r.it), eq = EQ[r.m] || {}, keys = {}, rows = [], ok = true;
+  function checkRecipe(r, pl) {
+    pl = pl || activePlan();
+    var t = totals(itemsFor(r, pl)), eq = eqOf(pl, r.m), keys = {}, rows = [], ok = true;
     Object.keys(eq).concat(Object.keys(t)).forEach(function (k) { keys[k] = 1; });
     GROUPS.forEach(function (g) {
       if (!keys[g.k]) return;
-      var have = Math.round((t[g.k] || 0) * 100) / 100, need = eq[g.k] || 0, good = Math.abs(have - need) < 0.02;
+      var have = Math.round((t[g.k] || 0) * 100) / 100, need = +eq[g.k] || 0, good = Math.abs(have - need) < 0.02;
       if (!good) ok = false;
       rows.push({ k: g.k, have: have, need: need, ok: good });
     });
     return { ok: ok, rows: rows };
   }
   function gpill(k, txt) { return '<span class="gp" style="background:var(--g-' + k + ')">' + esc(txt) + "</span>"; }
-  function checkPills(r) {
-    return checkRecipe(r).rows.map(function (x) {
+  function checkPills(r, pl) {
+    return checkRecipe(r, pl).rows.map(function (x) {
       return '<span class="gp" style="background:var(--g-' + x.k + ')' + (x.ok ? "" : ";box-shadow:inset 0 0 0 1.5px var(--warn)") + '">' + esc(x.k) + " " + fracTxt(x.have) + "/" + x.need + (x.ok ? "" : " ⚠︎") + "</span>";
     }).join("");
   }
@@ -408,14 +447,16 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     h += '<div class="daynav"><button class="btn sm icon" data-act="day" data-d="-1" aria-label="Día anterior">‹</button><div class="dl">' + esc(dayLabel(k, true)) + '</div><button class="btn sm icon" data-act="day" data-d="1" aria-label="Día siguiente">›</button></div>';
     if (k !== today) h += '<div class="note"><span>Estás viendo otro día.</span><button data-act="day-today">Volver a hoy</button></div>';
     if (d && d.skip) return h + '<div class="empty card"><b>Día omitido</b>' + esc(d.skip) + '. Este día no cuenta para tus compras ni para tu apego.<div style="margin-top:14px"><button class="btn" data-act="skip-undo" data-date="' + k + '">Deshacer omisión</button></div></div>';
-    var done = {}, nDone = 0;
+    var pl = planOn(k), eqd = eqDay(pl), done = {}, nDone = 0;
+    h += '<div style="margin:-6px 0 12px;text-align:center"><button class="tag" style="font-size:10.5px;padding:4px 10px" data-act="plans">Plan: ' + planTag(pl) + " ›</button></div>";
     MEALS.forEach(function (m) {
       var s = d && d.m[m.k], r = s && s.r && recipeById(s.r);
-      if (s && s.d) { nDone++; var t = r ? totals(r.it) : EQ[m.k]; Object.keys(t).forEach(function (g) { done[g] = (done[g] || 0) + t[g]; }); }
+      if (s && s.d) { nDone++; var t = r ? totals(itemsFor(r, pl)) : eqOf(pl, m.k); Object.keys(t).forEach(function (g) { done[g] = (done[g] || 0) + t[g]; }); }
     });
     h += '<div class="card stack" style="margin-bottom:16px"><div class="row spread"><h2 style="margin:0">Porciones del día</h2><span class="tag' + (nDone === 5 ? " ok" : "") + '">' + nDone + " de 5 comidas</span></div><div class='gtrack'>";
     GROUPS.forEach(function (g) {
-      var need = EQDAY[g.k] || 0, have = Math.round((done[g.k] || 0) * 100) / 100, pct = need ? Math.min(100, have / need * 100) : 0;
+      if (!eqd[g.k] && !done[g.k]) return;
+      var need = eqd[g.k] || 0, have = Math.round((done[g.k] || 0) * 100) / 100, pct = need ? Math.min(100, have / need * 100) : 0;
       h += '<div class="gname"><span class="dot" style="background:var(--g-' + g.k + ')"></span><span>' + esc(g.n) + '</span></div><div class="gnum">' + fracTxt(have) + " / " + need + '</div><div class="bar"><i class="' + (have >= need - 0.01 ? "full" : "") + '" style="width:' + pct + '%"></i></div>';
     });
     h += "</div></div>";
@@ -439,13 +480,14 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function viewRecetas() {
     var h = '<h1>Recetas</h1><p class="sub">Toca una receta para verla y cambiar ingredientes por su equivalente.</p>';
     h += '<div class="chips" role="group" aria-label="Tiempo de comida">' + MEALS.map(function (m) { return '<button class="chip" data-act="meal" data-m="' + m.k + '" aria-pressed="' + (ui.meal === m.k) + '">' + m.n + "</button>"; }).join("") + "</div>";
-    var eq = EQ[ui.meal];
+    var apl = activePlan(), eq = eqOf(apl, ui.meal);
+    h += '<div class="vgrid" style="margin-bottom:12px"><button class="tag" data-act="plans">Plan: ' + planTag(apl) + ' ›</button></div>';
     h += '<div class="vgrid" style="margin-bottom:12px"><span class="meta" style="align-self:center">Te tocan:</span>' + Object.keys(eq).map(function (g) { return gpill(g, eq[g] + " " + GBY[g].n.toLowerCase()); }).join("") + "</div>";
     var list = recipesOf(ui.meal);
     if (!list.length) return h + '<div class="empty"><b>Sin recetas</b>Agrega una con el botón “+ Receta”.</div>';
     h += '<div class="stack">';
     list.forEach(function (r) {
-      var c = checkRecipe(r), names = r.it.filter(function (x) { return x.f; }).map(function (x) { return FBY[x.f] ? FBY[x.f].n : ""; });
+      var c = checkRecipe(r, apl), names = itemsFor(r, apl).filter(function (x) { return x.f && x.p > 0; }).map(function (x) { return FBY[x.f] ? FBY[x.f].n : ""; });
       h += '<button class="card stack" style="text-align:left;gap:6px" data-act="open-recipe" data-id="' + esc(r.id) + '">';
       h += '<div class="row spread" style="align-items:flex-start"><span class="label">' + (r.o ? "Opción " + r.o : "Propia") + "</span>" + (c.ok ? '<span class="tag ok">Cuadra con tu plan</span>' : '<span class="tag bad">No cuadra</span>') + "</div>";
       h += '<div class="rname">' + esc(r.n) + '</div><div class="meta">' + esc(names.slice(0, 4).join(" · ") + (names.length > 4 ? " · …" : "")) + "</div></button>";
@@ -459,17 +501,21 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     if (rv.date) { var s = slot(rv.date, rv.m, false); return (s && s.r === rv.id && s.s) || {}; }
     return ui.tmp;
   }
+  function ctxPlan() { return ui.rv && ui.rv.date ? planOn(ui.rv.date) : activePlan(); }
   function recipeSheet() {
     var rv = ui.rv, r = recipeById(rv.id); if (!r) { closeSheet(); return; }
-    var subs = curSubs(), c = checkRecipe(r), m = MBY[r.m], h = "";
+    var pl = ctxPlan(), items = itemsFor(r, pl), subs = curSubs(), c = checkRecipe(r, pl), m = MBY[r.m], h = "";
     var s = rv.date ? slot(rv.date, rv.m, false) : null, inDay = s && s.r === r.id;
     h += '<div class="row" style="gap:6px;margin-bottom:6px"><span class="tag">' + esc(m.n) + " · " + m.h + "</span>" + (c.ok ? '<span class="tag ok">Cuadra</span>' : '<span class="tag bad">No cuadra</span>') + "</div>";
     h += "<h2>" + esc(r.n) + "</h2>";
     if (rv.date) h += '<p class="meta" style="margin:-6px 0 10px;text-transform:capitalize">' + esc(dayLabel(rv.date, true)) + "</p>";
-    h += '<div class="vgrid" style="margin-bottom:12px">' + checkPills(r) + "</div>";
+    h += '<div class="vgrid" style="margin-bottom:8px">' + checkPills(r, pl) + "</div>";
+    h += '<p class="meta" style="margin:0 0 12px">Plan: ' + planTag(pl) + (isScaled(r, pl) ? " · porciones ajustadas automáticamente a esta tabla" : recipeBase(r) !== pl.id ? " · ajuste propio para esta tabla" : "") + "</p>";
+    if (!c.ok) { var miss = c.rows.filter(function (x) { return x.have < x.need - 0.01 && !x.have; }); if (miss.length) h += '<div class="note" style="display:block">Para cuadrar con esta tabla falta: ' + esc(miss.map(function (x) { return fracTxt(x.need) + " " + GBY[x.k].n.toLowerCase(); }).join(", ")) + '. Ajústala con “Editar receta”.</div>'; }
     h += '<div class="label" style="margin-bottom:2px">Ingredientes</div><div>';
     var changed = [];
-    r.it.forEach(function (it, i) {
+    items.forEach(function (it, i) {
+      if (it.f && !(it.p > 0)) return;
       if (!it.f) { h += '<div class="ing free"><div class="in">' + esc(it.t) + '</div><div></div><div class="iq">' + esc(it.c || "al gusto") + " · libre</div></div>"; return; }
       var orig = FBY[it.f], f = subFood(it, subs, i); if (!f) return;
       var q = qty(f, it.p), was = f.id !== it.f;
@@ -500,7 +546,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   /* Cambiar un ingrediente: mismo grupo, misma cantidad de porciones. */
   function swapSheet() {
-    var r = recipeById(ui.rv.id), it = r.it[ui.sub], subs = curSubs(), cur = subFood(it, subs, ui.sub), orig = FBY[it.f], g = GBY[orig.g];
+    var r = recipeById(ui.rv.id), it = itemsFor(r, ctxPlan())[ui.sub], subs = curSubs(), cur = subFood(it, subs, ui.sub), orig = FBY[it.f], g = GBY[orig.g];
     var h = "<h2>Cambiar " + esc(cur.n.toLowerCase()) + "</h2>";
     h += '<p class="sub" style="margin-bottom:10px">' + gpill(g.k, g.n) + " · necesitas <b>" + porTxt(it.p) + "</b>. Elige con qué lo sustituyes:</p>";
     h += '<input type="search" id="subq" placeholder="Buscar en ' + esc(g.n.toLowerCase()) + '…" value="' + esc(ui.q) + '" autocomplete="off" style="margin-bottom:10px">';
@@ -510,7 +556,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   }
   function norm(s) { return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
   function swapList() {
-    var r = recipeById(ui.rv.id), it = r.it[ui.sub], cur = subFood(it, curSubs(), ui.sub), orig = FBY[it.f], q = norm(ui.q);
+    var r = recipeById(ui.rv.id), it = itemsFor(r, ctxPlan())[ui.sub], cur = subFood(it, curSubs(), ui.sub), orig = FBY[it.f], q = norm(ui.q);
     var list = FOODS.filter(function (f) { return f.g === orig.g && (!q || norm(f.n).indexOf(q) > -1); });
     list.sort(function (a, b) { return (b.id === orig.id) - (a.id === orig.id) || a.n.localeCompare(b.n, "es"); });
     if (!list.length) return '<p class="meta">Sin resultados.</p>';
@@ -524,8 +570,9 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function chooseSheet(k, m) {
     ui.pick = { date: k, m: m };
     var s = slot(k, m, false), h = "<h2>" + esc(MBY[m].n) + "</h2><p class='sub' style='text-transform:capitalize'>" + esc(dayLabel(k, true)) + " · " + MBY[m].h + "</p><div class='olist'>";
+    var cpl = planOn(k);
     recipesOf(m).forEach(function (r) {
-      var c = checkRecipe(r);
+      var c = checkRecipe(r, cpl);
       h += '<button class="opt' + (s && s.r === r.id ? " cur" : "") + '" data-act="set-recipe" data-id="' + esc(r.id) + '"><span class="dot" style="background:var(--' + (c.ok ? "good" : "warn") + ')"></span><span class="on">' + esc(r.n) + '</span><span class="oq">' + (r.o ? "Opción " + r.o : "Propia") + "</span></button>";
     });
     h += "</div>";
@@ -533,11 +580,58 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     openSheet(h);
   }
 
+  /* Tablas de equivalentes */
+  var MAB = { des: "Des", c1: "Col 1", com: "Com", c2: "Col 2", cen: "Cena" };
+  function plansSheet() {
+    var apl = activePlan(), h = "<h2>Tablas de equivalentes</h2><p class='sub'>La tabla vigente define cuántas porciones te tocan en cada comida. Las recetas ajustan sus porciones a ella.</p><div class='olist'>";
+    S.plans.forEach(function (p) {
+      h += '<button class="opt' + (p.id === apl.id ? " cur" : "") + '" data-act="plan-view" data-id="' + esc(p.id) + '"><span class="dot" style="background:var(--' + (p.id === apl.id ? "yellow" : "line") + ')"></span><span class="on">' + esc(p.n) + '<br><span class="meta">' + esc(TIPOS[p.tipo] || "") + '</span></span><span class="oq">' + (p.id === apl.id ? '<span class="tag">Vigente</span>' : "") + "</span></button>";
+    });
+    h += '</div><button class="btn block" style="margin-top:12px" data-act="plan-new">+ Nueva tabla</button>';
+    openSheet(h);
+  }
+  function eqTable(eq, edit) {
+    var h = '<div class="eqg"><span></span>' + MEALS.map(function (m) { return '<span class="eh">' + MAB[m.k] + "</span>"; }).join("");
+    var day = {}; MEALS.forEach(function (m) { var e = eq[m.k] || {}; Object.keys(e).forEach(function (g) { day[g] = (day[g] || 0) + (+e[g] || 0); }); });
+    GROUPS.forEach(function (g) {
+      if (!edit && !day[g.k]) return;
+      h += '<span class="en"><span class="dot" style="background:var(--g-' + g.k + ')"></span><span>' + esc(g.n) + '<small id="pet-' + g.k + '">' + fracTxt(day[g.k] || 0) + " al día</small></span></span>";
+      MEALS.forEach(function (m) {
+        var v = +((eq[m.k] || {})[g.k]) || 0;
+        h += edit ? '<input type="number" inputmode="decimal" step="0.5" min="0" data-in="pe-v" data-g="' + g.k + '" data-m="' + m.k + '" value="' + (v || "") + '" aria-label="' + esc(g.n) + " en " + m.n + '">' : '<span class="ev' + (v ? "" : " z") + '">' + (v ? fracTxt(v) : "·") + "</span>";
+      });
+    });
+    return h + "</div>";
+  }
+  function planViewSheet(id) {
+    var p = planById(id), apl = activePlan(), used = S.planHist.some(function (x) { return x.id === id; }), h = "";
+    ui.pv = id;
+    h += '<div class="row" style="gap:6px;margin-bottom:6px"><span class="tag">' + esc(TIPOS[p.tipo] || "") + "</span>" + (p.id === apl.id ? '<span class="tag ok">Vigente</span>' : "") + "</div><h2>" + esc(p.n) + "</h2>";
+    h += eqTable(p.eq, false);
+    h += '<div class="stack" style="margin-top:16px">';
+    if (p.id !== apl.id) h += '<button class="btn primary block" data-act="plan-use">Usar esta tabla desde hoy</button><p class="meta" style="margin:-4px 0 0">Los días anteriores conservan la tabla que tenían; tus recetas ajustan sus porciones a esta tabla desde hoy.</p>';
+    h += '<button class="btn block" data-act="plan-edit">Editar tabla</button>';
+    if (p.id !== apl.id && !used && p.id !== BASE_PLAN) h += '<button class="btn danger block" data-act="plan-del">Borrar tabla</button>';
+    h += '<button class="btn ghost block" data-act="plans">Volver a las tablas</button></div>';
+    openSheet(h, "plans");
+  }
+  function planEditSheet() {
+    var e = ui.pe, h = "<h2>" + (e.isNew ? "Nueva tabla" : "Editar tabla") + "</h2><div class='stack'>";
+    h += '<label class="field"><span class="label">Nombre</span><input data-in="pe-name" value="' + esc(e.n) + '" placeholder="Ej. Déficit enero"></label>';
+    h += '<label class="field"><span class="label">Tipo de plan</span><select data-in="pe-tipo">' + Object.keys(TIPOS).map(function (k) { return '<option value="' + k + '"' + (k === e.tipo ? " selected" : "") + ">" + TIPOS[k] + "</option>"; }).join("") + "</select></label>";
+    h += '<div class="field"><span class="label">Porciones por comida</span><span class="meta">Deja vacío lo que no te toca. Se puede usar 0.5.</span></div>';
+    h += eqTable(e.eq, true);
+    if (!e.isNew && S.planHist.some(function (x) { return x.id === e.id; })) h += '<p class="meta">Si cambias una tabla que ya usaste, también cambian los cálculos de esos días.</p>';
+    h += '<button class="btn primary block" data-act="pe-save">Guardar tabla</button><button class="btn ghost block" data-act="pe-cancel">Cancelar</button></div>';
+    openSheetKeep(h, "pe-cancel");
+  }
+
   /* Editor de recetas */
   function editSheet() {
     var e = ui.edit, h = "<h2>" + (e.isNew ? "Nueva receta" : "Editar receta") + "</h2><div class='stack'>";
     h += '<label class="field"><span class="label">Nombre</span><input data-in="name" value="' + esc(e.n) + '" placeholder="Ej. Bowl de pollo"></label>';
     h += '<label class="field"><span class="label">Tiempo de comida</span><select data-in="meal">' + MEALS.map(function (m) { return '<option value="' + m.k + '"' + (m.k === e.m ? " selected" : "") + ">" + m.n + " · " + m.h + "</option>"; }).join("") + "</select></label>";
+    if (e.base !== e.pl) h += '<div class="note" style="display:block">Estás ajustando esta receta para la tabla <b>' + esc(planById(e.pl).n) + "</b>. La versión de " + esc((planById(e.base) || { n: "su plan original" }).n) + " no cambia." + (planById(e.pl) && !e.isNew && (recipeById(e.id) || {}).ov && recipeById(e.id).ov[e.pl] ? '<div style="margin-top:8px"><button class="btn sm ghost" data-act="e-auto">Volver al ajuste automático</button></div>' : "") + "</div>";
     h += '<div class="field"><span class="label">Ingredientes que cuentan porción</span><span class="meta">Elige el alimento y cuántas porciones lleva; la cantidad se calcula sola.</span></div>';
     e.it.forEach(function (it, i) {
       if (!it.f) return;
@@ -559,7 +653,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     openSheetKeep(h, "e-cancel");
   }
   function editValid() {
-    var c = checkRecipe({ m: ui.edit.m, it: ui.edit.it });
+    var c = checkRecipe({ m: ui.edit.m, it: ui.edit.it, pl: ui.edit.pl }, planById(ui.edit.pl));
     return '<div class="card" style="background:' + (c.ok ? "var(--good-soft)" : "var(--yellow-soft)") + ';border-color:' + (c.ok ? "var(--good-line)" : "var(--yellow-line)") + '"><div class="label" style="margin-bottom:6px">' + (c.ok ? "✓ Cuadra con tus equivalentes de " + MBY[ui.edit.m].n.toLowerCase() : "Aún no cuadra con " + MBY[ui.edit.m].n.toLowerCase()) + '</div><div class="vgrid">' +
       c.rows.map(function (x) { return '<span class="gp" style="background:var(--g-' + x.k + ')' + (x.ok ? "" : ";box-shadow:inset 0 0 0 1.5px var(--warn)") + '">' + esc(GBY[x.k].n) + " " + fracTxt(x.have) + "/" + x.need + "</span>"; }).join("") + "</div></div>";
   }
@@ -614,7 +708,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
         var s = d.m[m.k], r = s && s.r && recipeById(s.r); if (!r) return;
         if (k < today || s.d || d.skip) { nSkip++; return; }
         nMeals++; any = true;
-        r.it.forEach(function (it, i) {
+        itemsFor(r, planOn(k)).forEach(function (it, i) {
+          if (it.f && !(it.p > 0)) return;
           if (!it.f) { freeParts(it.t).forEach(function (t) { var key = norm(t); (free[key] = free[key] || { t: t, n: 0 }).n++; }); return; }
           var f = subFood(it, s.s, i); if (!f) return;
           byFood[f.id] = (byFood[f.id] || 0) + (+it.p || 0);
@@ -691,6 +786,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var from30 = dayKey(addDays(t, -29)); if (first && first > from30) from30 = first;
     var wFrom = first && first > ws ? first : ws;
     var body = S.body.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }), lastW = body.filter(function (b) { return b.w; }), wNow = lastW.length ? lastW[lastW.length - 1] : null, w0 = lastW[0];
+    var apl = activePlan(), since = planSince(t);
+    h += '<div class="card row spread" style="margin-bottom:12px"><div style="min-width:0"><div class="label">Plan de alimentación vigente</div><div class="rname">' + esc(apl.n) + '</div><div class="meta">' + esc(TIPOS[apl.tipo] && TIPOS[apl.tipo] !== apl.n ? TIPOS[apl.tipo] : "Tabla de equivalentes") + (since && since > "2000-01-01" ? " · desde el " + esc(dayLabel(since)) : "") + '</div></div><button class="btn sm" data-act="plans">Tablas</button></div>';
     h += '<div class="kpis"><div class="card kpi"><span class="label">Racha</span><b>' + streak() + "</b><span>días completos seguidos</span></div>";
     h += '<div class="card kpi"><span class="label">Esta semana</span><b>' + pctTxt(first ? adherence(wFrom, t) : 0) + "</b><span>de comidas hechas</span></div>";
     h += '<div class="card kpi"><span class="label">Últimos 30 días</span><b>' + pctTxt(first ? adherence(from30, t) : 0) + "</b><span>de apego</span></div>";
@@ -798,8 +895,10 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   /* ---------- acciones ---------- */
   function startEdit(r, isNew) {
-    ui.edit = { isNew: isNew, id: r.id, m: r.m, n: r.n, o: r.o, it: clone(r.it || []), st: (r.st || []).slice() };
+    var pl = activePlan(), its = clone(isNew ? [] : itemsFor(r, pl)).filter(function (it) { return !it.f || it.p > 0; }).map(function (it) { delete it.auto; return it; });
+    ui.edit = { isNew: isNew, id: r.id, m: r.m, n: r.n, o: r.o, it: its, st: (r.st || []).slice(), pl: pl.id, base: isNew ? pl.id : recipeBase(r) };
     ui.confirm = false; editSheet();
+    var pn = $("#sheet .panel"); if (pn) pn.scrollTop = 0;
   }
   function saveEdit() {
     var e = ui.edit, name = (e.n || "").trim();
@@ -809,9 +908,12 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var steps = e.st.map(function (x) { return x.trim(); }).filter(Boolean);
     var r = e.isNew ? null : recipeById(e.id);
     if (!r) { r = { id: "r" + uid() }; S.recipes.push(r); }
-    var oldItems = JSON.stringify(r.it || []);
+    var oldItems = JSON.stringify(r.it ? itemsFor(r, planById(e.pl)) : []);
     if (e.isNew || r.m !== e.m) r.o = recipesOf(e.m).reduce(function (mx, x) { return x.id !== r.id && x.o > mx ? x.o : mx; }, 0) + 1;
-    r.m = e.m; r.n = name; r.it = items; r.st = steps;
+    if (e.isNew) r.pl = e.pl;
+    r.m = e.m; r.n = name; r.st = steps;
+    // En el plan base se cambia la receta; en otro plan se guarda como ajuste propio para esa tabla.
+    if (recipeBase(r) === e.pl) r.it = items; else { r.ov = r.ov || {}; r.ov[e.pl] = items; }
     if (oldItems !== JSON.stringify(items)) S.days.forEach(function (d) { Object.keys(d.m).forEach(function (m) { if (d.m[m].r === r.id) d.m[m].s = {}; }); });
     persist();
     var keepRv = ui.rv && ui.rv.id === r.id ? ui.rv : null;
@@ -873,7 +975,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       case "swap": ui.sub = +d.i; ui.q = ""; swapSheet(); setTimeout(function () { var i = $("#subq"); if (i && window.innerWidth > 700) i.focus(); }, 30); break;
       case "back-recipe": ui.q = ""; recipeSheet(); break;
       case "pick-sub": {
-        var rv = ui.rv, r = recipeById(rv.id), orig = r.it[ui.sub].f, subs;
+        var rv = ui.rv, r = recipeById(rv.id), orig = itemsFor(r, ctxPlan())[ui.sub].f, subs;
         if (rv.date) { var sl = slot(rv.date, rv.m, true); if (sl.r !== rv.id) { sl.r = rv.id; sl.s = {}; } subs = sl.s; } else subs = ui.tmp;
         if (d.f === orig) delete subs[ui.sub]; else subs[ui.sub] = d.f;
         if (rv.date) { persist(); render(); }
@@ -886,8 +988,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
         persist(); ui.rv = { id: rv3.id, m: rv3.m, date: t }; ui.tmp = {}; recipeSheet(); render(); toast("Agregada a hoy"); break;
       }
       case "save-subs": {
-        var r2 = recipeById(ui.rv.id);
-        Object.keys(ui.tmp).forEach(function (i) { r2.it[i].f = ui.tmp[i]; });
+        var r2 = recipeById(ui.rv.id), pl2 = ctxPlan(), arr = recipeBase(r2) !== pl2.id && r2.ov && r2.ov[pl2.id] ? r2.ov[pl2.id] : r2.it;
+        Object.keys(ui.tmp).forEach(function (i) { if (arr[i]) arr[i].f = ui.tmp[i]; });
         ui.tmp = {}; S.days.forEach(function (dd) { Object.keys(dd.m).forEach(function (m) { if (dd.m[m].r === r2.id) dd.m[m].s = {}; }); });
         persist(); recipeSheet(); render(); toast("Receta actualizada"); break;
       }
@@ -903,12 +1005,32 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
         ui.q = ""; editSheet(); break;
       }
       case "e-del": ui.edit.it.splice(+d.i, 1); editSheet(); break;
+      case "e-auto": { var ra = recipeById(ui.edit.id); if (ra && ra.ov) { delete ra.ov[ui.edit.pl]; persist(); } ui.edit = null; if (ui.rv) recipeSheet(); else closeSheet(); render(); toast("Porciones ajustadas automáticamente a la tabla"); break; }
       case "e-free": ui.edit.it.push({ t: "", c: "al gusto" }); editSheet(); break;
       case "e-save": saveEdit(); break;
       case "e-delete": ui.confirm = true; editSheet(); break;
       case "e-delete-no": ui.confirm = false; editSheet(); break;
       case "e-delete-do": deleteRecipe(); break;
       case "quick": quickRange(d.q); break;
+      case "plans": ui.pe = null; plansSheet(); break;
+      case "plan-view": planViewSheet(d.id); break;
+      case "plan-new": { var ap = activePlan(); ui.pe = { isNew: true, id: "p" + uid(), n: "", tipo: ap.tipo === "deficit" ? "volumen" : "deficit", eq: clone(ap.eq) }; planEditSheet(); break; }
+      case "plan-edit": { var pe = planById(ui.pv); ui.pe = { isNew: false, id: pe.id, n: pe.n, tipo: pe.tipo, eq: clone(pe.eq) }; planEditSheet(); break; }
+      case "pe-cancel": { var back = ui.pe && !ui.pe.isNew ? ui.pe.id : ""; ui.pe = null; if (back) planViewSheet(back); else plansSheet(); break; }
+      case "pe-save": {
+        var e2 = ui.pe, nm = (e2.n || "").trim();
+        if (!nm) { toast("Ponle nombre a la tabla."); break; }
+        var eqc = {}; MEALS.forEach(function (m) { eqc[m.k] = {}; Object.keys(e2.eq[m.k] || {}).forEach(function (g) { var v = +e2.eq[m.k][g]; if (v > 0) eqc[m.k][g] = v; }); });
+        var pp = planById(e2.id); if (!pp) { pp = { id: e2.id }; S.plans.push(pp); }
+        pp.n = nm; pp.tipo = e2.tipo; pp.eq = eqc;
+        ui.pe = null; persist(); render(); planViewSheet(pp.id); toast("Tabla guardada"); break;
+      }
+      case "plan-use": {
+        var t0 = dayKey(Date.now());
+        S.planHist = S.planHist.filter(function (x) { return x.from < t0; }).concat([{ from: t0, id: ui.pv }]);
+        persist(); render(); planViewSheet(ui.pv); toast("Desde hoy usas la tabla " + planById(ui.pv).n); break;
+      }
+      case "plan-del": { S.plans = S.plans.filter(function (x) { return x.id !== ui.pv; }); S.recipes.forEach(function (r) { if (r.ov) delete r.ov[ui.pv]; }); persist(); plansSheet(); render(); toast("Tabla borrada"); break; }
       case "skip-day": skipSheet(d.date); break;
       case "skip-set": { var dd0 = dayEntry(ui.skipDay, true); dd0.skip = d.r; persist(); closeSheet(); render(); toast("Día omitido"); break; }
       case "skip-undo": { var dd1 = dayById(d.date); if (dd1) { delete dd1.skip; cleanDay(d.date); persist(); } render(); toast("Omisión deshecha"); break; }
@@ -956,12 +1078,19 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     else if (k === "p") { var it = e.it[+t.dataset.i]; it.p = t.value === "" ? 0 : +String(t.value).replace(",", "."); var f = FBY[it.f], sm = $("#eq" + t.dataset.i); if (f && sm) sm.textContent = qtyTxt(f, +it.p || 0) + " · " + f.g; $("#evalid").innerHTML = editValid(); }
     else if (k === "t") e.it[+t.dataset.i].t = t.value;
     else if (k === "c") e.it[+t.dataset.i].c = t.value;
+    else if (k === "pe-name") ui.pe.n = t.value;
+    else if (k === "pe-v") {
+      var pe = ui.pe, mm = t.dataset.m, gg = t.dataset.g; pe.eq[mm] = pe.eq[mm] || {};
+      var v = parseFloat(String(t.value).replace(",", ".")); if (v > 0) pe.eq[mm][gg] = v; else delete pe.eq[mm][gg];
+      var tot = 0; MEALS.forEach(function (m) { tot += +((pe.eq[m.k] || {})[gg]) || 0; }); var el = $("#pet-" + gg); if (el) el.textContent = fracTxt(tot) + " al día";
+    }
     else if (k.indexOf("b-") === 0 && b) { if (k === "b-date") b.date = t.value; else b[k.slice(2)] = t.value; }
   });
   document.addEventListener("change", function (ev) {
     var t = ev.target, k = t.dataset && t.dataset.in;
     if (t.id === "rsf") { readRestore(t.files && t.files[0]); t.value = ""; return; }
     if (k === "meal") { ui.edit.m = t.value; $("#evalid").innerHTML = editValid(); }
+    else if (k === "pe-tipo") ui.pe.tipo = t.value;
     else if (k === "plan") { setRecipe(t.dataset.date, t.dataset.m, t.value); render(); }
     else if (k === "plan-from" || k === "plan-to") {
       if (!t.value) return;
@@ -1063,12 +1192,13 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function curMaps() {
     var m = {};
     Object.keys(ARR).forEach(function (c) { m[c] = {}; (S[ARR[c]] || []).forEach(function (x) { if (x && x.id) m[c][String(x.id)] = JSON.stringify(x); }); });
-    m.rx_meta = { plan: JSON.stringify(S.plan), shop: JSON.stringify(S.shop), seen: JSON.stringify(S.seen || []) };
+    m.rx_meta = { plan: JSON.stringify(S.plan), shop: JSON.stringify(S.shop), seen: JSON.stringify(S.seen || []), plans: JSON.stringify(S.plans), planHist: JSON.stringify(S.planHist) };
     return m;
   }
   function applyItem(c, id, v) {
     var x = v === null ? null : JSON.parse(v);
     if (c === "rx_meta") { if (x && (id === "plan" || id === "shop")) S[id] = x;
+      if (x && (id === "plans" || id === "planHist") && Array.isArray(x) && x.length) S[id] = x;
       if (x && id === "seen" && Array.isArray(x)) x.forEach(function (k) { if ((S.seen || (S.seen = [])).indexOf(k) < 0) S.seen.push(k); });
       return; }
     var arr = S[ARR[c]] = S[ARR[c]] || [], i = arr.map(function (y) { return String(y.id); }).indexOf(id);
