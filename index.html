@@ -227,7 +227,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 <script>
 (function () {
   "use strict";
-  var APP_VERSION = 10;
+  var APP_VERSION = 11;
   var LS = "recetario-v1";
   var DAY = 86400000;
 
@@ -437,7 +437,15 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
   function skipSheet(k) {
     ui.skipDay = k;
     openSheet("<h2>Omitir día</h2><p class='sub'>" + esc(dayTitle(k)) + ". Todo el día no contará en tu lista de compras ni en tu apego al plan. Elige el motivo:</p><div class='olist'>" +
-      SKIPS.map(function (x) { return '<button class="opt" data-act="skip-set" data-r="' + esc(x) + '"><span class="dot" style="background:var(--yellow)"></span><span class="on">' + esc(x) + "</span><span></span></button>"; }).join("") + "</div>");
+      SKIPS.map(function (x) { return '<button class="opt" data-act="skip-set" data-r="' + esc(x) + '"><span class="dot" style="background:var(--yellow)"></span><span class="on">' + esc(x) + "</span><span></span></button>"; }).join("") +
+      '<button class="opt" data-act="skip-other"><span class="dot" style="background:var(--line)"></span><span class="on">Otro motivo</span><span class="oq">Escribir</span></button></div>');
+  }
+  function skipOtherSheet() {
+    var k = ui.skipDay;
+    openSheet("<h2>Omitir día</h2><p class='sub'>" + esc(dayTitle(k)) + ". Todo el día no contará en tu lista de compras ni en tu apego al plan.</p><div class='stack'>" +
+      '<label class="field"><span class="label">¿Por qué lo omites?</span><input id="skq" maxlength="80" placeholder="Ej. viaje" autocomplete="off"></label>' +
+      '<button class="btn primary block" data-act="skip-other-set">Omitir día</button><button class="btn ghost block" data-act="skip-back">Volver</button></div>', "skip-back");
+    setTimeout(function () { var i = $("#skq"); if (i) i.focus(); }, 30);
   }
   function subFood(it, subs, i) { var f = subs && subs[i] && FBY[subs[i]]; return f || FBY[it.f]; }
 
@@ -1054,6 +1062,13 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
       case "plan-del": { S.plans = S.plans.filter(function (x) { return x.id !== ui.pv; }); S.recipes.forEach(function (r) { if (r.ov) delete r.ov[ui.pv]; }); persist(); plansSheet(); render(); toast("Tabla borrada"); break; }
       case "skip-day": skipSheet(d.date); break;
       case "meal-skip": mealSkipSheet(d.date, d.m); break;
+      case "skip-other": skipOtherSheet(); break;
+      case "skip-back": skipSheet(ui.skipDay); break;
+      case "skip-other-set": {
+        var why2 = (($("#skq") || {}).value || "").trim();
+        if (!why2) { toast("Escribe el motivo."); break; }
+        var dd2 = dayEntry(ui.skipDay, true); dd2.skip = why2; persist(); closeSheet(); render(); toast("Día omitido"); break;
+      }
       case "meal-skip-set": {
         var sm = ui.skipMeal, why = (($("#omq") || {}).value || "").trim() || "Sin motivo";
         var so = slot(sm.date, sm.m, true); so.o = why; so.d = false;
@@ -1129,7 +1144,8 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     }
   });
   document.addEventListener("keydown", function (ev) {
-    if (ev.key === "Enter" && ev.target.id === "omq") { ev.preventDefault(); act("meal-skip-set", ev.target); return; } if (ev.key === "Escape" && ui.sheet) { var x = $("#sheet .sheetx"); if (x) x.click(); } });
+    if (ev.key === "Enter" && ev.target.id === "omq") { ev.preventDefault(); act("meal-skip-set", ev.target); return; }
+    if (ev.key === "Enter" && ev.target.id === "skq") { ev.preventDefault(); act("skip-other-set", ev.target); return; } if (ev.key === "Escape" && ui.sheet) { var x = $("#sheet .sheetx"); if (x) x.click(); } });
 
   /* ---------- respaldo ---------- */
   function exportBackup() {
