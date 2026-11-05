@@ -422,13 +422,13 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     if (!Object.keys(d.m).length && !d.skip) S.days = S.days.filter(function (x) { return x.id !== k; });
   }
   /* Días omitidos (día de oficina o día libre): no cuentan para compras ni para el apego.
-     Tiempos de comida omitidos: no cuentan para el apego, pero sí siguen en la lista de compras. */
+     Tiempos de comida omitidos: no cuentan para el apego, pero siguen en la lista de compras y en las metas de porciones del día. */
   var SKIPS = ["Día de oficina", "Día libre"];
   function omitOf(k, m) { var d = dayById(k), s = d && d.m[m]; return s && s.o ? s.o : ""; }
   function mealsExpected(k) { return MEALS.filter(function (m) { return !omitOf(k, m.k); }).length; }
   function mealSkipSheet(k, m) {
     ui.skipMeal = { date: k, m: m };
-    openSheet("<h2>Omitir " + esc(MBY[m].n.toLowerCase()) + "</h2><p class='sub'>" + esc(dayTitle(k)) + " · " + MBY[m].h + ". No contará en tu apego al plan. Sus ingredientes siguen en tu lista de compras.</p><div class='stack'>" +
+    openSheet("<h2>Omitir " + esc(MBY[m].n.toLowerCase()) + "</h2><p class='sub'>" + esc(dayTitle(k)) + " · " + MBY[m].h + ". No contará en tu apego al plan; sus porciones siguen apareciendo como pendientes en Hoy y sus ingredientes siguen en tu lista de compras.</p><div class='stack'>" +
       '<label class="field"><span class="label">¿Por qué lo omites?</span><input id="omq" maxlength="80" placeholder="Ej. comida con amigos" autocomplete="off"></label>' +
       '<button class="btn primary block" data-act="meal-skip-set">Omitir ' + esc(MBY[m].n.toLowerCase()) + '</button><button class="btn ghost block" data-act="close">Cancelar</button></div>');
     setTimeout(function () { var i = $("#omq"); if (i) i.focus(); }, 30);
@@ -461,14 +461,14 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     h += '<div class="daynav"><button class="btn sm icon" data-act="day" data-d="-1" aria-label="Día anterior">‹</button><div class="dl">' + esc(dayLabel(k, true)) + '</div><button class="btn sm icon" data-act="day" data-d="1" aria-label="Día siguiente">›</button></div>';
     if (k !== today) h += '<div class="note"><span>Estás viendo otro día.</span><button data-act="day-today">Volver a hoy</button></div>';
     if (d && d.skip) return h + '<div class="empty card"><b>Día omitido</b>' + esc(d.skip) + '. Este día no cuenta para tus compras ni para tu apego.<div style="margin-top:14px"><button class="btn" data-act="skip-undo" data-date="' + k + '">Deshacer omisión</button></div></div>';
-    var pl = planOn(k), eqd = {}, done = {}, nDone = 0, nExp = mealsExpected(k);
-    MEALS.forEach(function (m) { if (omitOf(k, m.k)) return; var e = eqOf(pl, m.k); Object.keys(e).forEach(function (g) { eqd[g] = (eqd[g] || 0) + (+e[g] || 0); }); });
+    // Las comidas omitidas siguen contando en las metas: no hay certeza de que esas porciones se hayan cubierto.
+    var pl = planOn(k), eqd = eqDay(pl), done = {}, nDone = 0, nOmit = MEALS.length - mealsExpected(k);
     h += '<div style="margin:-6px 0 12px;text-align:center"><button class="tag" style="font-size:10.5px;padding:4px 10px" data-act="plans">Plan: ' + planTag(pl) + " ›</button></div>";
     MEALS.forEach(function (m) {
       var s = d && d.m[m.k], r = s && s.r && recipeById(s.r);
       if (s && s.d && !s.o) { nDone++; var t = r ? totals(itemsFor(r, pl)) : eqOf(pl, m.k); Object.keys(t).forEach(function (g) { done[g] = (done[g] || 0) + t[g]; }); }
     });
-    h += '<div class="card stack" style="margin-bottom:16px"><div class="row spread"><h2 style="margin:0">Porciones del día</h2><span class="tag' + (nExp && nDone === nExp ? " ok" : "") + '">' + nDone + " de " + nExp + (nExp === 1 ? " comida" : " comidas") + "</span></div><div class='gtrack'>";
+    h += '<div class="card stack" style="margin-bottom:16px"><div class="row spread"><h2 style="margin:0">Porciones del día</h2><span class="tag' + (nDone === 5 ? " ok" : "") + '">' + nDone + " de 5 comidas" + (nOmit ? " · " + nOmit + (nOmit === 1 ? " omitida" : " omitidas") : "") + "</span></div><div class='gtrack'>";
     GROUPS.forEach(function (g) {
       if (!eqd[g.k] && !done[g.k]) return;
       var need = eqd[g.k] || 0, have = Math.round((done[g.k] || 0) * 100) / 100, pct = need ? Math.min(100, have / need * 100) : 0;
@@ -784,9 +784,10 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
 
   /* Progreso: apego al plan, racha, peso y medidas */
   function doneCount(k) { var d = dayById(k); if (!d) return 0; return MEALS.filter(function (m) { return d.m[m.k] && d.m[m.k].d && !d.m[m.k].o; }).length; }
-  // Un día "cuenta como completo" si hiciste todas las comidas que no omitiste; si omitiste todo, es como un día omitido.
-  function dayFree(k) { return !!skipOf(k) || mealsExpected(k) === 0; }
-  function dayFull(k) { var e = mealsExpected(k); return e > 0 && doneCount(k) === e; }
+  // Racha: un día la mantiene si marcaste al menos 3 tiempos de comida como hechos. Los días omitidos completos no la rompen ni la suman.
+  var STREAK_MIN = 3;
+  function dayFree(k) { return !!skipOf(k); }
+  function dayFull(k) { return doneCount(k) >= STREAK_MIN; }
   function streak() {
     // Los días omitidos no suman ni rompen la racha.
     var t = dayKey(Date.now()), n = 0, k = dayFull(t) || dayFree(t) ? t : dayKey(addDays(t, -1)), guard = 0;
@@ -808,7 +809,7 @@ h3 { font-family: var(--display); font-weight: 400; font-size: 15.5px; margin: 0
     var body = S.body.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }), lastW = body.filter(function (b) { return b.w; }), wNow = lastW.length ? lastW[lastW.length - 1] : null, w0 = lastW[0];
     var apl = activePlan(), since = planSince(t);
     h += '<div class="card row spread" style="margin-bottom:12px"><div style="min-width:0"><div class="label">Plan de alimentación vigente</div><div class="rname">' + esc(apl.n) + '</div><div class="meta">' + esc(TIPOS[apl.tipo] && TIPOS[apl.tipo] !== apl.n ? TIPOS[apl.tipo] : "Tabla de equivalentes") + (since && since > "2000-01-01" ? " · desde el " + esc(dayLabel(since)) : "") + '</div></div><button class="btn sm" data-act="plans">Tablas</button></div>';
-    h += '<div class="kpis"><div class="card kpi"><span class="label">Racha</span><b>' + streak() + "</b><span>días completos seguidos</span></div>";
+    h += '<div class="kpis"><div class="card kpi"><span class="label">Racha</span><b>' + streak() + "</b><span>días seguidos con 3+ comidas hechas</span></div>";
     h += '<div class="card kpi"><span class="label">Esta semana</span><b>' + pctTxt(first ? adherence(wFrom, t) : 0) + "</b><span>de comidas hechas</span></div>";
     h += '<div class="card kpi"><span class="label">Últimos 30 días</span><b>' + pctTxt(first ? adherence(from30, t) : 0) + "</b><span>de apego</span></div>";
     h += '<div class="card kpi"><span class="label">Peso actual</span><b>' + (wNow ? fmtNum(wNow.w) + " kg" : "—") + "</b><span>" + (wNow && w0 && w0 !== wNow ? (wNow.w - w0.w > 0 ? "+" : "") + fmtNum(wNow.w - w0.w) + " kg desde el inicio" : "registra tu peso abajo") + "</span></div></div>";
